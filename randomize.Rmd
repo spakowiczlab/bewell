@@ -1,0 +1,64 @@
+---
+title: "BE WELL Study Randomization"
+author: "Dan Spakowicz"
+date: "2019-10-24"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+
+library(randomizr)
+library(tidyverse)
+```
+
+# Create a dataset for the sample size with 
+
+```{r}
+# Sample size
+n <- 42 
+
+# Create dataframe of mostly equal numbers of current smokers vs quit,
+# and of males and females
+df <- data.frame(smoking = c(rep(0, n / 2), 
+                             rep(1, n/2)),
+                 gender = c(rep(
+                   c(rep(0, ceiling(n/4)),
+                     rep(1, floor(n/4))),
+                   2)
+                 )
+) %>%
+  # Create a group label
+  mutate(group = ifelse(smoking == 0 & gender == 0, 1,
+                        ifelse(smoking == 0 & gender == 1, 2,
+                               ifelse(smoking == 1 & gender == 0, 3, 4)
+                        )
+  )
+  ) %>%
+  # Rename binary with informative labels
+  mutate(smoking = ifelse(smoking == 0, "currSmoker", "quit")) %>%
+  mutate(gender = ifelse(gender == 0, "Male", "Female")) %>%
+  arrange(group)
+
+
+table(df$group)
+```
+
+Here's some text. 
+
+```{r}
+set.seed(8675309)
+
+treatment <- 
+  df %>%
+  arrange(group) %>%
+  mutate(first.treatment = block_ra(blocks = df$group)) %>%
+  mutate(first.treatment = ifelse(first.treatment == 1, 683, 294))
+
+table(treatment$first.treatment, treatment$group)
+```
+
+```{r}
+treatment$first.treatment
+```
+
