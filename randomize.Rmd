@@ -1,8 +1,10 @@
 ---
 title: "BE WELL Study Randomization"
 author: "Dan Spakowicz"
-date: "2019-10-24"
-output: html_document
+date: '2019-10-24'
+output:
+  pdf_document: default
+  html_document: default
 ---
 
 ```{r setup, include=FALSE}
@@ -12,11 +14,13 @@ library(randomizr)
 library(tidyverse)
 ```
 
-# Create a dataset for the sample size with 
+# Create a dataset for the sample size with stratification by gender and smoking status
 
 ```{r}
 # Sample size
-n <- 42 
+n <- 100 
+# Our sample size is 42, but allocating for more participants allows for uneven 
+# groups while ensuring even split by the stratifying vars
 
 # Create dataframe of mostly equal numbers of current smokers vs quit,
 # and of males and females
@@ -44,7 +48,7 @@ df <- data.frame(smoking = c(rep(0, n / 2),
 table(df$group)
 ```
 
-Here's some text. 
+There are four groups: male smoker, male former smoker, female smoker and female former smoker. I'll now randomly assign them to start with box 682 or 294 using the `block_ra` function from the `randomizr` package.
 
 ```{r}
 set.seed(8675309)
@@ -59,6 +63,41 @@ table(treatment$first.treatment, treatment$group)
 ```
 
 ```{r}
-treatment$first.treatment
+write.csv(x = treatment, 
+            file = "randomize-vector.csv", 
+            quote = FALSE, row.names = FALSE
+)
 ```
+
+RedCap has a randomization table with columns `rand_tx` with values 0 or 6, `gender` with values 0, 1, or 2, and `rand_smoke_status` with values 0 or 1. Renaming the treatment table to follow this format.
+
+```{r}
+redcap <- 
+  treatment %>%
+  select(first.treatment, gender, smoking) %>%
+  rename("rand_tx" = "first.treatment") %>%
+  mutate(rand_tx = ifelse(rand_tx == 683, 0, 6)) %>%
+  rename("rand_smoke_status" = "smoking") %>%
+  mutate(rand_smoke_status = ifelse(rand_smoke_status == "quit", 0, 1)) %>%
+  mutate(gender = ifelse(gender == "Male", 1, 2)) 
+```
+
+```{r}
+write.csv(x = redcap, 
+            file = "RedCap_randomize-vector.csv", 
+            quote = FALSE, row.names = FALSE
+)
+```
+
+Check the already uploaded development allocation table.
+
+```{r}
+rat.dev <- read.csv("RandomizationAllocationTable_Dev.csv")
+```
+
+```{r}
+table(rat.dev)
+```
+
+That is not even. Uploading `RedCap_randomize-vector.csv`.
 
