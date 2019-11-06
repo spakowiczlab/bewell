@@ -18,7 +18,7 @@ library(tidyverse)
 
 ```{r}
 # Sample size
-n <- 100 
+n <- 200 
 # Our sample size is 42, but allocating for more participants allows for uneven 
 # groups while ensuring even split by the stratifying vars
 
