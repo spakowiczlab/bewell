@@ -72,7 +72,7 @@ write.csv(x = treatment,
 RedCap has a randomization table with columns `rand_tx` with values 0 or 6, `gender` with values 0, 1, or 2, and `rand_smoke_status` with values 0 or 1. Renaming the treatment table to follow this format.
 
 Key:
-`rand_tx` 6 = boxes labeled with 683, 0 = 294
+`rand_tx` to recieve 683 at week 0 = week 0, 6 = week 6
 `rand_smoke_status` 0 = former smoker, 1 = current smoker
 `gender` 1 = Male, 2 = Female
 
@@ -82,7 +82,7 @@ redcap <-
   treatment %>%
   select(first.treatment, gender, smoking) %>%
   rename("rand_tx" = "first.treatment") %>%
-  mutate(rand_tx = ifelse(rand_tx == 683, 6, 0)) %>%
+  mutate(rand_tx = ifelse(rand_tx == 683, 0, 6)) %>%
   rename("rand_smoke_status" = "smoking") %>%
   mutate(rand_smoke_status = ifelse(rand_smoke_status == "quit", 0, 1)) %>%
   mutate(gender = ifelse(gender == "Male", 1, 2)) 
