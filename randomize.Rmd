@@ -85,7 +85,8 @@ redcap <-
   mutate(rand_tx = ifelse(rand_tx == 683, 0, 6)) %>%
   rename("rand_smoke_status" = "smoking") %>%
   mutate(rand_smoke_status = ifelse(rand_smoke_status == "quit", 0, 1)) %>%
-  mutate(gender = ifelse(gender == "Male", 1, 2)) 
+  mutate(gender_rx = ifelse(gender == "Male", 1, 2)) %>%
+  select(-gender)
 ```
 
 ```{r}
