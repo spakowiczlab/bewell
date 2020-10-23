@@ -370,10 +370,21 @@ summary {
 </div>
 
 
-<div id="load-date" class="section level1">
-<h1>Load date</h1>
+<div id="load-data" class="section level1">
+<h1>Load data</h1>
 <pre class="r"><code># Read in data table (Created by Amna, updated 2020-10-22)
-x &lt;- read_xlsx(&quot;../data/raw/BeWell-studyid_consentdate.xlsx&quot;)</code></pre>
+x &lt;- read_xlsx(&quot;../data/raw/BeWell-studyid_consentdate.xlsx&quot;)
+
+head(x)</code></pre>
+<pre><code>## # A tibble: 6 x 3
+##     `#` `Study ID` `Consent Date`     
+##   &lt;dbl&gt; &lt;chr&gt;      &lt;dttm&gt;             
+## 1     1 HONC60-01  2019-10-25 00:00:00
+## 2     2 HONC60-03  2019-11-22 00:00:00
+## 3     3 HONC60-05  2019-12-16 00:00:00
+## 4     4 HONC60-07  2019-12-23 00:00:00
+## 5     5 HONC60-42  2020-01-06 00:00:00
+## 6     6 HONC60-17  2020-01-27 00:00:00</code></pre>
 </div>
 <div id="create-vars" class="section level1">
 <h1>Create vars</h1>
@@ -410,10 +421,12 @@ head(xm)</code></pre>
 </div>
 <div id="model" class="section level1">
 <h1>Model</h1>
-<pre class="r"><code>xm.lo &lt;- loess(formula = n.consented ~ as.numeric(date),
+<pre class="r"><code># Build model on the data
+xm.lo &lt;- loess(formula = n.consented ~ as.numeric(date),
                data = xm,
                control = loess.control(surface = &quot;direct&quot;))
 
+# Define the prediction time window
 new.data &lt;- data.frame(date = as.numeric(seq.Date(from = Sys.Date(),
                                                   to = as.Date(&quot;2021-01-01&quot;), 
                                                   by = &quot;days&quot;)

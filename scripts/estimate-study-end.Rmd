@@ -13,12 +13,13 @@ library(tidyverse)
 library(broom)
 ```
 
-# Load date
+# Load data
 
 ```{r}
 # Read in data table (Created by Amna, updated 2020-10-22)
 x <- read_xlsx("../data/raw/BeWell-studyid_consentdate.xlsx")
 
+head(x)
 ```
 
 # Create vars
@@ -40,7 +41,6 @@ head(xm)
 # Plot
 
 ```{r}
-
 xm %>%
   ggplot(aes(x = date, y = n.consented)) +
   geom_point() +
@@ -51,10 +51,12 @@ xm %>%
 # Model
 
 ```{r}
+# Build model on the data
 xm.lo <- loess(formula = n.consented ~ as.numeric(date),
                data = xm,
                control = loess.control(surface = "direct"))
 
+# Define the prediction time window
 new.data <- data.frame(date = as.numeric(seq.Date(from = Sys.Date(),
                                                   to = as.Date("2021-01-01"), 
                                                   by = "days")
