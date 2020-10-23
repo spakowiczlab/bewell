@@ -1,0 +1,51 @@
+---
+title: "Facebook advertising"
+author: "Daniel Spakowicz"
+date: "9/11/2020"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+
+library(tidyverse)
+```
+
+```{r}
+x <- read.csv("../data/raw/2020-09-11_facebook-clicks.csv") %>%
+  mutate(Date = as.Date(Date, format = "%d-%b"))
+```
+
+How long did the Facebook add run before the $200 cap was reached?
+
+```{r}
+max(x$Date) - min(x$Date)
+```
+
+Did we begin to saturate the market, observable by fewer clicks per day over time?
+
+```{r}
+x %>%
+  ggplot(aes(x = Date, y = Link.Clicks)) +
+  geom_point() +
+  stat_smooth(method = "lm") +
+  theme_bw()
+```
+No, it looks like the number of clicks per day remained constant throughout the campaign period.
+
+Did the cost per click change over time, suggesting that more and more "impressions" were necessary to generate this constant level of clicks?
+
+```{r}
+x %>%
+  ggplot(aes(x = Date, y = Cost.per.result)) +
+  geom_point() +
+  stat_smooth(method = "lm") +
+  theme_bw()
+
+```
+
+```{r}
+summary(lm(Cost.per.result ~ Date, data = x))
+```
+
+No, the cost per click did not change significantly over time.

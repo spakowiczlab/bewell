@@ -1,0 +1,121 @@
+---
+title: "Estimate Study End"
+author: "Amna Bibi and Dan Spakowicz"
+date: "10/22/2020"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+
+library(readxl)
+library(tidyverse)
+library(broom)
+```
+
+# Load date
+
+```{r}
+# Read in data table (Created by Amna, updated 2020-10-22)
+x <- read_xlsx("../data/raw/BeWell-studyid_consentdate.xlsx")
+
+```
+
+# Create vars
+
+```{r}
+xm <- 
+  x %>%
+  drop_na() %>%
+  rename(date = "Consent Date") %>%
+  arrange(date) %>%
+  mutate(date = as.Date(date)) %>%
+  mutate(n.consented = seq(from = 1, to = nrow(.))) %>%
+  mutate(date.num = as.numeric(date)) %>%
+  mutate(origin = "data")
+
+head(xm)
+```
+
+# Plot
+
+```{r}
+
+xm %>%
+  ggplot(aes(x = date, y = n.consented)) +
+  geom_point() +
+  stat_smooth() +
+  theme_bw()
+```
+
+# Model
+
+```{r}
+xm.lo <- loess(formula = n.consented ~ as.numeric(date),
+               data = xm,
+               control = loess.control(surface = "direct"))
+
+new.data <- data.frame(date = as.numeric(seq.Date(from = Sys.Date(),
+                                                  to = as.Date("2021-01-01"), 
+                                                  by = "days")
+                                         )
+                       )
+                             
+pred <- predict(object = xm.lo, 
+                newdata = new.data,
+                se = TRUE)
+
+model.out <- data.frame(n.consented = pred$fit,
+                        se.fit = pred$se.fit,
+                        date = as.Date(new.data$date, 
+                                       origin = as.Date("1970-01-01")),
+                        origin = "prediction")
+
+head(model.out)
+```
+
+# Plot model
+
+```{r}
+model.out %>%
+  ggplot(aes(x = date, y = n.consented)) +
+  geom_point() +
+  theme_bw()
+```
+
+```{r}
+dm <- 
+  xm %>%
+  bind_rows(model.out)
+
+head(dm)
+```
+
+```{r}
+dm %>%
+  ggplot(aes(x = date, y = n.consented)) +
+  geom_point(aes(color = origin)) +
+  stat_smooth() +
+  theme_bw() +
+  geom_hline(yintercept = 42, linetype = "dotted", color = "red") +
+  geom_vline(xintercept = dm$date[min(grep("^42.", dm$n.consented))],
+             linetype = "dotted",
+             color = "red") +
+  geom_text(x = as.Date("2020-10-10"),
+            y = 5,
+            label = paste0("Estimated full enrollment on\n", dm$date[min(grep("^42.", dm$n.consented))]))
+```
+
+# Time until full enrollment
+
+```{r}
+dm$date[min(grep("^42.", dm$n.consented))] - Sys.Date()
+```
+
+
+# Estimated study completion (assuming no holiday breaks)
+
+```{r}
+dm$date[min(grep("^42.", dm$n.consented))] + lubridate::weeks(11)
+```
+
