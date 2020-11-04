@@ -1,0 +1,51 @@
+---
+title: "dates-to-avoid"
+author: "Dan Spakowicz"
+date: "11/4/2020"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+
+library(lubridate)
+library(tidyverse)
+```
+
+The purpose of this script is to identify when to avoid scheduling a BEWELL Study visit 1 such that future visits do not fall on holidays. 
+
+
+# Setup
+
+Define the dates to avoid and the number weeks from that date
+
+```{r}
+dates <- c("2020-11-25", "2020-11-26", "2020-11-27", "2020-12-23", "2020-12-24", "2020-12-25", "2020-12-31", "2021-01-01")
+
+ddates <- lapply(dates, as.Date)
+
+weeks <- c(4, 6, 10)
+```
+
+# Calculate
+
+Subtract the weeks from the holidays and dates neighborhing holidays.
+
+```{r}
+avoid <- lapply(ddates, function(x) x - weeks(weeks)) %>%
+  unlist %>%
+  as.Date(., origin = "1970-01-01")
+
+avoid
+```
+
+# Combine and list
+
+```{r}
+avoid.all <- c(as.numeric(ddates), avoid) %>%
+  sort 
+
+avoid.all %>%
+  as.Date(., origin = "1970-01-01")
+```
+
