@@ -105,7 +105,10 @@ dm %>%
              color = "red") +
   geom_text(x = as.Date("2020-10-10"),
             y = 5,
-            label = paste0("Estimated full enrollment on\n", dm$date[min(grep("^42.", dm$n.consented))]))
+            label = paste0("Estimated full enrollment on\n", dm$date[min(grep("^42.", dm$n.consented))])) +
+  labs(y = "Number Consented", x = "Date",
+       subtitle = "Predicted full enrollment by local polynomial regression") +
+  ggsave("../figures/consent-prediction.png")
 ```
 
 # Time until full enrollment
@@ -113,7 +116,6 @@ dm %>%
 ```{r}
 dm$date[min(grep("^42.", dm$n.consented))] - Sys.Date()
 ```
-
 
 # Estimated study completion (assuming no holiday breaks)
 
