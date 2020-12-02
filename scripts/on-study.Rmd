@@ -1,0 +1,113 @@
+---
+title: "on-study"
+author: "Amna Bibi and Dan Spakowicz"
+date: "11/20/2020"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+
+library(readxl)
+library(tidyverse)
+
+source("00-paths.R")
+```
+
+```{r}
+x <- readxl::read_xlsx(file.path(paths$box, 
+                                 "participants", 
+                                 "Be Well Study Schedule.xlsx"),
+                       skip = 1, trim_ws = TRUE)
+
+head(x)
+```
+
+```{r}
+xs <- 
+  x %>%
+  select(`Subject ID`, `Consented date`, `Visit 1`, `Redoing V1`, `Visit 2`, `Visit 3`, `Redoing V3`, `Visit 4`)
+
+summary(xs)
+```
+
+```{r}
+xsl <- 
+  xs %>%
+  gather(-`Subject ID`, key = "event", value = "date")
+```
+
+```{r}
+saveRDS(xsl, file.path(paths$derived, "study-dates.RDS"))
+```
+
+```{r}
+x <- readRDS(file.path(paths$derived, "study-dates.RDS"))
+```
+
+```{r}
+x %>%
+  ggplot(aes(date, `Subject ID`)) +
+  geom_point(aes(color = event)) +
+  theme_bw() +
+  theme(axis.text.y = element_blank()) +
+  geom_vline(xintercept = as.POSIXct(Sys.Date()), 
+             color = "red", linetype = "dotted")
+```
+
+```{r}
+xw <- 
+  x %>%
+  spread(key = "event", value = "date") %>%
+  mutate(on.study = (`Visit 4` - as.POSIXct(Sys.Date())) > 0,
+         completed = (`Visit 4` - as.POSIXct(Sys.Date())) < 0)
+
+t.on.study <- 
+  table(xw$on.study, useNA = "ifany") %>%
+  data.frame
+
+true.on.study <- t.on.study[2, 2]
+```
+
+There are `r true.on.study` participants currently on study.
+
+```{r}
+t.completed <- 
+  xw %>%
+  count(completed)
+
+t.completed
+
+true.completed <- t.completed[2,2]
+```
+There are `r as.numeric(true.completed)` participants who have completed the study.
+
+```{r}
+left.to.complete <- 42 - (true.on.study + true.completed)
+```
+
+There are `r left.to.complete` participants left to fully completed the study.
+
+```{r}
+dropout.freq <- 0.8
+
+left.to.enroll <- left.to.complete / dropout.freq
+```
+
+With a dropout frequency of `r dropout.freq`, there are `r left.to.enroll` participants left to enroll.
+
+# Gift cards to purchase by Dec 14 
+
+How many gift cards do we expect to need between now and Jan 7?
+
+```{r}
+gc <- 
+  x %>%
+  filter(date > as.POSIXct(Sys.Date())) %>%
+  mutate(before.reoder = date < as.POSIXct("2021-01-07", tz = "EST")) %>%
+  count(before.reoder)
+
+gc
+```
+We will need `r gc$n[grep("TRUE", gc$before.reoder)]` gift cards between `r as.Date(Sys.Date())` and Jan 7, when we are able to place an additional order.
+

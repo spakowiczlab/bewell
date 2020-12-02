@@ -15,21 +15,18 @@ library(tidyverse)
 The purpose of this script is to identify when to avoid scheduling a BEWELL Study visit 1 such that future visits do not fall on holidays. 
 
 
-# Setup
-
-Define the dates to avoid and the number weeks from that date
+## Define the dates to avoid and the number weeks from that date
 
 ```{r}
-dates <- c("2020-11-25", "2020-11-26", "2020-11-27", "2020-12-23", "2020-12-24", "2020-12-25", "2020-12-31", "2021-01-01")
+dates <- c("2020-11-25", "2020-11-26", "2020-11-27", "2020-12-23", "2020-12-24",
+           "2020-12-25", "2020-12-31", "2021-01-01")
 
 ddates <- lapply(dates, as.Date)
 
 weeks <- c(4, 6, 10)
 ```
 
-# Calculate
-
-Subtract the weeks from the holidays and dates neighborhing holidays.
+Subtract the weeks from the holidays and dates neighboring holidays.
 
 ```{r}
 avoid <- lapply(ddates, function(x) x - weeks(weeks)) %>%
@@ -39,13 +36,42 @@ avoid <- lapply(ddates, function(x) x - weeks(weeks)) %>%
 avoid
 ```
 
-# Combine and list
+Combine and list 
 
 ```{r}
 avoid.all <- c(as.numeric(ddates), avoid) %>%
   sort 
 
-avoid.all %>%
+avoid.all.d <- 
+  avoid.all %>%
+  unique %>%
   as.Date(., origin = "1970-01-01")
+```
+
+# DO NOT SCHEDULE VISIT 1 on:
+```{r, echo=FALSE}
+avoid.all.d
+```
+
+Create a similar list focused on v3
+
+```{r}
+v3wk <- 4
+
+avoidv3 <- lapply(ddates, function(x) x - weeks(v3wk)) %>%
+  unlist %>%
+  as.Date(., origin = "1970-01-01")
+
+avoid.v3 <- c(as.numeric(ddates), avoidv3) %>%
+  sort 
+
+avoid.all.v3.d <- 
+  avoid.v3 %>%
+  unique %>%
+  as.Date(., origin = "1970-01-01")
+```
+# DO NOT SCHEDULE VISIT 3 on:
+```{r, echo=FALSE}
+avoid.all.v3.d 
 ```
 

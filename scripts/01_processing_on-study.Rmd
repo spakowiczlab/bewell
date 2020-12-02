@@ -1,0 +1,45 @@
+---
+title: "01_processing_study-schedule"
+author: "Amna Bibi and Dan Spakowicz"
+date: "11/24/2020"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+
+library(readxl)
+library(tidyverse)
+
+source("00-paths.R")
+```
+
+This script reads in the schedule spreadsheet for the BE WELL study, processes and writes a uniform RDS object in long format.
+
+```{r cars}
+x <- readxl::read_xlsx(file.path(paths$box, 
+                                 "participants", 
+                                 "Be Well Study Schedule.xlsx"),
+                       skip = 1, trim_ws = TRUE)
+
+head(x)
+```
+
+```{r}
+xs <- 
+  x %>%
+  select(`Subject ID`, `Consented date`, `Visit 1`, `Redoing V1`, `Visit 2`, `Visit 3`, `Redoing V3`, `Visit 4`)
+
+summary(xs)
+```
+
+```{r}
+xsl <- 
+  xs %>%
+  gather(-`Subject ID`, key = "event", value = "date")
+```
+
+```{r}
+saveRDS(xsl, file.path(paths$derived, "study-dates.RDS"))
+```
+
