@@ -52,7 +52,9 @@ x %>%
   theme_bw() +
   theme(axis.text.y = element_blank()) +
   geom_vline(xintercept = as.POSIXct(Sys.Date()), 
-             color = "red", linetype = "dotted")
+             color = "red", linetype = "dotted") +
+  ggsave("../figures/on-study.png", height = 3, width = 5)
+
 ```
 
 ```{r}
