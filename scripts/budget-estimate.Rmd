@@ -1,0 +1,93 @@
+---
+title: "Budget"
+author: "Dan Spakowicz"
+date: "12/10/2020"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## Budget estimate
+
+### Microbiome
+
+```{r}
+mcost.psamp <- 280
+tp <- 4
+pts <- 42
+
+mcost <- mcost.psamp * tp * pts
+
+mcost
+```
+
+### Serum cytokines
+
+```{r}
+scost.psamp <- 150
+
+scost <- scost.psamp * tp * pts
+
+scost
+```
+
+### Retention incentive
+
+```{r}
+rcost.ptp <- 50
+
+rcost <- rcost.ptp * tp * pts
+
+rcost
+```
+
+Just for the remaining patients
+
+```{r}
+rcost.ptp <- 50
+
+# There are 16 patients remaining to go through the study
+ptsr <- 16 
+
+rcostr <- rcost.ptp * tp * ptsr
+
+rcostr
+```
+
+### Clinical Research Center Processing Costs
+
+```{r}
+ccost.ptp <- 68
+
+ccost <- ccost.ptp * tp * pts
+
+ccost
+```
+
+Just for the remaining patients
+
+```{r}
+ccostr <- ccost.ptp * tp * ptsr
+
+ccostr
+```
+
+```{r}
+personnel <- 41183
+```
+
+```{r}
+shipping <- 5
+
+shipping * ptsr
+```
+
+# Totals
+
+## Total cost to complete the study
+```{r}
+ccostr + rcostr + scost + mcost + personnel + ptsr
+```
+
