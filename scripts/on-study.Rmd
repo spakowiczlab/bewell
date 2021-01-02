@@ -18,7 +18,9 @@ source("00-paths.R")
 x <- readxl::read_xlsx(file.path(paths$box, 
                                  "participants", 
                                  "Be Well Study Schedule.xlsx"),
-                       skip = 1, trim_ws = TRUE)
+                       skip = 1, 
+                       trim_ws = TRUE,
+                       sheet = 1)
 
 head(x)
 ```
@@ -42,11 +44,11 @@ saveRDS(xsl, file.path(paths$derived, "study-dates.RDS"))
 ```
 
 ```{r}
-x <- readRDS(file.path(paths$derived, "study-dates.RDS"))
+xd <- readRDS(file.path(paths$derived, "study-dates.RDS"))
 ```
 
 ```{r}
-x %>%
+xd %>%
   ggplot(aes(date, `Subject ID`)) +
   geom_point(aes(color = event)) +
   theme_bw() +
@@ -59,7 +61,7 @@ x %>%
 
 ```{r}
 xw <- 
-  x %>%
+  xd %>%
   spread(key = "event", value = "date") %>%
   mutate(on.study = (`Visit 4` - as.POSIXct(Sys.Date())) > 0,
          completed = (`Visit 4` - as.POSIXct(Sys.Date())) < 0)
@@ -104,7 +106,7 @@ How many gift cards do we expect to need between now and Jan 7?
 
 ```{r}
 gc <- 
-  x %>%
+  xd %>%
   filter(date > as.POSIXct(Sys.Date())) %>%
   mutate(before.reoder = date < as.POSIXct("2021-01-07", tz = "EST")) %>%
   count(before.reoder)
@@ -112,4 +114,35 @@ gc <-
 gc
 ```
 We will need `r gc$n[grep("TRUE", gc$before.reoder)]` gift cards between `r as.Date(Sys.Date())` and Jan 7, when we are able to place an additional order.
+
+
+
+```{r}
+y <- readxl::read_xlsx(file.path(paths$box, 
+                                 "participants", 
+                                 "Be Well Study Schedule.xlsx"),
+                       trim_ws = TRUE,
+                       sheet = 2)
+
+head(y)
+```
+
+```{r}
+z <- full_join(x, y)
+
+summary(z)
+```
+
+```{r}
+v1 <- 
+  z %>%
+  select(`Subject ID`, contains(c("Visit 1", "V1"))) %>%
+  mutate(`Visit 1` = if_else(condition = !is.na(`Redoing V1`), 
+                            true = `Redoing V1`,
+                            false =  `Visit 1`)) %>%
+  select(-`Redoing V1`)
+
+
+
+```
 
