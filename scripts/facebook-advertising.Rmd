@@ -12,8 +12,10 @@ library(tidyverse)
 ```
 
 ```{r}
-x <- read.csv("../data/raw/2020-09-11_facebook-clicks.csv") %>%
-  mutate(Date = as.Date(Date, format = "%d-%b"))
+x <- read_csv("../data/raw/2020-09-11_facebook-clicks.csv") %>%
+  mutate(Date = as.Date(Date, format = "%d-%b")) %>%
+  mutate(Image = "People") %>%
+  rename("Cost Per Result" = "Cost per result")
 ```
 
 How long did the Facebook add run before the $200 cap was reached?
@@ -26,7 +28,7 @@ Did we begin to saturate the market, observable by fewer clicks per day over tim
 
 ```{r}
 x %>%
-  ggplot(aes(x = Date, y = Link.Clicks)) +
+  ggplot(aes(x = Date, y = `Link Clicks`)) +
   geom_point() +
   stat_smooth(method = "lm") +
   theme_bw()
@@ -37,7 +39,7 @@ Did the cost per click change over time, suggesting that more and more "impressi
 
 ```{r}
 x %>%
-  ggplot(aes(x = Date, y = Cost.per.result)) +
+  ggplot(aes(x = Date, y = `Cost Per Result`)) +
   geom_point() +
   stat_smooth(method = "lm") +
   theme_bw()
@@ -45,7 +47,44 @@ x %>%
 ```
 
 ```{r}
-summary(lm(Cost.per.result ~ Date, data = x))
+summary(lm(`Cost Per Result` ~ Date, data = x))
 ```
 
 No, the cost per click did not change significantly over time.
+
+# Review of the second ad campaign
+
+```{r}
+y <- read_csv("../data/raw/2020-10-20_facebook-clicks.csv") %>%
+  select(-X5) %>%
+  mutate(Date = as.Date(Date, format = "%d-%b")) %>%
+  rename("Cost Per Result" = "Cost Per result")
+
+cleanCost <- function(vec) {
+  gsub("^.*\\$.*(\\d\\.\\d+)", "\\1", vec) %>%
+    as.numeric
+}
+
+y2 <- 
+  y %>%
+  mutate_at(c("Cost Per Result", "Total Daily Cost"), cleanCost)
+
+head(y2)
+```
+
+```{r}
+z <- bind_rows(x, y2)
+
+summary(z)
+```
+
+```{r}
+z %>%
+  ggplot(aes(x = Date, y = `Cost Per Result`)) +
+  geom_point(aes(color = Image)) +
+  stat_smooth(method = "lm", aes(color = Image)) +
+  theme_bw() +
+  ggsave("../figures/facebook_costperresult.png",
+         height = 5, width = 8)
+```
+
