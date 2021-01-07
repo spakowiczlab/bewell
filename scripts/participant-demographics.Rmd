@@ -1,0 +1,91 @@
+---
+title: "participant-demographics"
+author: "Dan Spakowicz"
+date: "1/7/2021"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+
+library(readxl)
+library(tidyverse)
+library(tableone)
+
+source("00-paths.R")
+```
+
+```{r}
+y <- readxl::read_xlsx(file.path(paths$box, 
+                                 "participants", 
+                                 "Be Well Study Schedule.xlsx"),
+                       trim_ws = TRUE,
+                       sheet = 2)
+
+head(y)
+```
+
+```{r}
+df <- 
+  y %>%
+  mutate(recruitment.style = if_else(`how did you hear about us?` == "LCSC",
+                                     true = "in person",
+                                     false = "social media"),
+         dropout = if_else(is.na(`V1 Blood`),
+                           true = TRUE,
+                           false = FALSE),
+         across(c("Gender", "Smoking status", "Race/ethnicity"), tolower),
+         `Race/ethnicity` = if_else(`Race/ethnicity` == "white",
+                                    true = "caucasian",
+                                    false = `Race/ethnicity`),
+         `Race/ethnicity` = if_else(`Race/ethnicity` == "white caucasian",
+                                    true = "caucasian",
+                                    false = `Race/ethnicity`),
+         `Race/ethnicity` = if_else(`Race/ethnicity` == "black",
+                                    true = "african american",
+                                    false = `Race/ethnicity`),
+         `Race/ethnicity` = if_else(`Race/ethnicity` == "african",
+                                    true = "african american",
+                                    false = `Race/ethnicity`),
+         across(c("Gender", "Smoking status", "Race/ethnicity", "dropout"),
+                as.factor)
+         )
+  
+
+head(df)
+```
+
+```{r}
+table(df$`how did you hear about us?`)
+```
+
+```{r}
+table(df$recruitment.style)
+```
+
+```{r}
+table(df$recruitment.style, df$dropout)
+```
+
+```{r}
+fisher.test(df$recruitment.style, df$dropout)
+```
+
+
+Create a table of the results stratified by `recruitment.style`.
+
+```{r}
+str(df$Gender)
+
+listVars <- c("Age", "Gender", "Smoking status", "Race/ethnicity", "dropout")
+catVars <- c("Gender", "Smoking status", "Race/ethnicity", "dropout")
+```
+
+```{r table 1}
+table1 <- CreateTableOne(vars = listVars,
+                         data = df,
+                         factorVars = catVars,
+                         strata = "recruitment.style")
+table1
+```
+

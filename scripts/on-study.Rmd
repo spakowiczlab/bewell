@@ -137,10 +137,15 @@ summary(z)
 v1 <- 
   z %>%
   select(`Subject ID`, contains(c("Visit 1", "V1"))) %>%
-  mutate(`Visit 1` = if_else(condition = !is.na(`Redoing V1`), 
+  mutate(date = if_else(condition = !is.na(`Redoing V1`), 
                             true = `Redoing V1`,
                             false =  `Visit 1`)) %>%
-  select(-`Redoing V1`)
+  select(-`Visit 1`, -`Redoing V1`) %>%
+  mutate(visit = ifelse(is.na(date), NA, 1)) %>%
+  rename(`V1 S1, S2` = "stool.vial",
+         `V1 St1-9` = "stool.tub",
+         `V1 U1-10` = "urine")
+  
 
 
 
