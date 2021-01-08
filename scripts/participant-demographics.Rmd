@@ -2,7 +2,10 @@
 title: "participant-demographics"
 author: "Dan Spakowicz"
 date: "1/7/2021"
-output: html_document
+output:
+  html_document: default
+  pdf_document: default
+  word_document: default
 ---
 
 ```{r setup, include=FALSE}
@@ -11,6 +14,7 @@ knitr::opts_chunk$set(echo = TRUE)
 library(readxl)
 library(tidyverse)
 library(tableone)
+library(flextable)
 
 source("00-paths.R")
 ```
@@ -87,5 +91,37 @@ table1 <- CreateTableOne(vars = listVars,
                          factorVars = catVars,
                          strata = "recruitment.style")
 table1
+```
+
+```{r}
+table1p <- print(table1, printToggle = FALSE)
+
+# flextable 
+
+table2 <- table1p %>%
+
+  as.data.frame() %>%
+  
+  rownames_to_column("Variables")%>%
+  
+  flextable() %>%
+  
+  autofit(add_w = 0.2) %>%
+  
+  align(align = "left") %>%
+  
+  align(align = "left", part = "header") %>%
+  
+  add_header_lines("Table 1: Demographics stratified by recruitment style.")
+
+kableone(table1)
+```
+
+```{r}
+
+tab3Mat <- print(table1, quote = FALSE, noSpaces = TRUE, printToggle = FALSE)
+
+## Save to a CSV file
+write.csv(tab3Mat, file = "../data/derived/demographics-table.csv")
 ```
 

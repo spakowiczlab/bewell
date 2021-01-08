@@ -488,6 +488,107 @@ table1</code></pre>
 ##      caucasian                   25 (67.6)     11 (73.3)             
 ##      decline to say               8 (21.6)      4 (26.7)             
 ##   dropout = TRUE (%)             37 (71.2)     10 (32.3)   0.001</code></pre>
+<pre class="r"><code>table1p &lt;- print(table1, printToggle = FALSE)
+
+# flextable 
+
+table2 &lt;- table1p %&gt;%
+
+  as.data.frame() %&gt;%
+  
+  rownames_to_column(&quot;Variables&quot;)%&gt;%
+  
+  flextable() %&gt;%
+  
+  autofit(add_w = 0.2) %&gt;%
+  
+  align(align = &quot;left&quot;) %&gt;%
+  
+  align(align = &quot;left&quot;, part = &quot;header&quot;) %&gt;%
+  
+  add_header_lines(&quot;Table 1: Demographics stratified by recruitment style.&quot;)
+
+kableone(table1)</code></pre>
+<table>
+<thead>
+<tr class="header">
+<th align="left"></th>
+<th align="left">in person</th>
+<th align="left">social media</th>
+<th align="left">p</th>
+<th align="left">test</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td align="left">n</td>
+<td align="left">52</td>
+<td align="left">31</td>
+<td align="left"></td>
+<td align="left"></td>
+</tr>
+<tr class="even">
+<td align="left">Age (mean (SD))</td>
+<td align="left">67.26 (5.77)</td>
+<td align="left">63.68 (6.77)</td>
+<td align="left">0.017</td>
+<td align="left"></td>
+</tr>
+<tr class="odd">
+<td align="left">Gender = male (%)</td>
+<td align="left">18 (40.0)</td>
+<td align="left">13 (41.9)</td>
+<td align="left">1.000</td>
+<td align="left"></td>
+</tr>
+<tr class="even">
+<td align="left">Smoking status = former (%)</td>
+<td align="left">30 (68.2)</td>
+<td align="left">16 (51.6)</td>
+<td align="left">0.226</td>
+<td align="left"></td>
+</tr>
+<tr class="odd">
+<td align="left">Race/ethnicity (%)</td>
+<td align="left"></td>
+<td align="left"></td>
+<td align="left">0.408</td>
+<td align="left"></td>
+</tr>
+<tr class="even">
+<td align="left">african american</td>
+<td align="left">4 (10.8)</td>
+<td align="left">0 ( 0.0)</td>
+<td align="left"></td>
+<td align="left"></td>
+</tr>
+<tr class="odd">
+<td align="left">caucasian</td>
+<td align="left">25 (67.6)</td>
+<td align="left">11 (73.3)</td>
+<td align="left"></td>
+<td align="left"></td>
+</tr>
+<tr class="even">
+<td align="left">decline to say</td>
+<td align="left">8 (21.6)</td>
+<td align="left">4 (26.7)</td>
+<td align="left"></td>
+<td align="left"></td>
+</tr>
+<tr class="odd">
+<td align="left">dropout = TRUE (%)</td>
+<td align="left">37 (71.2)</td>
+<td align="left">10 (32.3)</td>
+<td align="left">0.001</td>
+<td align="left"></td>
+</tr>
+</tbody>
+</table>
+<pre class="r"><code>tab3Mat &lt;- print(table1, quote = FALSE, noSpaces = TRUE, printToggle = FALSE)
+
+## Save to a CSV file
+write.csv(tab3Mat, file = &quot;../data/derived/demographics-table.csv&quot;)</code></pre>
 
 
 
