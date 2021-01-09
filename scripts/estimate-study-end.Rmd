@@ -64,7 +64,7 @@ xm.lo <- loess(formula = n.consented ~ as.numeric(date),
 
 # Define the prediction time window
 new.data <- data.frame(date = as.numeric(seq.Date(from = Sys.Date(),
-                                                  to = as.Date("2021-01-01"), 
+                                                  to = as.Date("2021-03-01"), 
                                                   by = "days")
                                          )
                        )
@@ -110,8 +110,7 @@ dm %>%
   geom_text(x = as.Date("2020-09-10"),
             y = 5,
             label = paste0("Estimated full enrollment\n", dm$date[min(grep("^96.", dm$n.consented))])) +
-    labs(y = "Number Consented", x = "Date",
-       subtitle = "Predicted full enrollment by local polynomial regression") +
+    labs(y = "Number Consented", x = "Date") +
   ggsave("../figures/consent-prediction.png", height = 3, width = 5)
 ```
 
