@@ -29,15 +29,40 @@ y <- readxl::read_xlsx(file.path(paths$box,
 head(y)
 ```
 
+Get the first sheet to retrieve the dropout date
+
+```{r}
+x <- readxl::read_xlsx(file.path(paths$box, 
+                                 "participants", 
+                                 "Be Well Study Schedule.xlsx"),
+                       trim_ws = TRUE,
+                       skip = 1,
+                       sheet = 1) %>%
+  select(`Subject ID`, `Drop Out`)
+
+head(x)
+```
+
+Process dropout to a logical
+
+```{r}
+do <- 
+  x %>%
+  mutate(dropout = if_else(is.na(`Drop Out`),
+                           true = FALSE,
+                           false = TRUE)) %>%
+  select(-`Drop Out`)
+```
+
+
+
 ```{r}
 df <- 
   y %>%
   mutate(recruitment.style = if_else(`how did you hear about us?` == "LCSC",
                                      true = "in person",
-                                     false = "social media"),
-         dropout = if_else(is.na(`V1 Blood`),
-                           true = TRUE,
-                           false = FALSE),
+                                     false = "social media",
+                                     missing = "unknown"),
          across(c("Gender", "Smoking status", "Race/ethnicity"), tolower),
          `Race/ethnicity` = if_else(`Race/ethnicity` == "white",
                                     true = "caucasian",
@@ -51,9 +76,10 @@ df <-
          `Race/ethnicity` = if_else(`Race/ethnicity` == "african",
                                     true = "african american",
                                     false = `Race/ethnicity`),
-         across(c("Gender", "Smoking status", "Race/ethnicity", "dropout"),
+         across(c("Gender", "Smoking status", "Race/ethnicity"),
                 as.factor)
-         )
+         ) %>%
+  left_join(do)
   
 
 head(df)
@@ -115,6 +141,7 @@ table2 <- table1p %>%
   add_header_lines("Table 1: Demographics stratified by recruitment style.")
 
 kableone(table1)
+print(table2)
 ```
 
 ```{r}
@@ -123,5 +150,25 @@ tab3Mat <- print(table1, quote = FALSE, noSpaces = TRUE, printToggle = FALSE)
 
 ## Save to a CSV file
 write.csv(tab3Mat, file = "../data/derived/demographics-table.csv")
+```
+
+```{r}
+table(df$`Smoking status`, df$Gender)
+```
+
+```{r}
+on.study <- 
+  df %>%
+  filter(!dropout)
+
+table(on.study$`Smoking status`, on.study$Gender)
+```
+
+```{r}
+summary(df$Age)
+```
+
+```{r}
+summary(on.study$Age)
 ```
 

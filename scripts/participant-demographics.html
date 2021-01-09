@@ -397,14 +397,38 @@ summary {
 ## #   U1-10` &lt;chr&gt;, `V3 Blood` &lt;chr&gt;, `V4 S1, S2` &lt;chr&gt;, `V4 St1-9` &lt;chr&gt;, `V4
 ## #   U1-10` &lt;chr&gt;, `V4 Blood` &lt;chr&gt;, Notes &lt;chr&gt;, ...24 &lt;lgl&gt;, ...25 &lt;lgl&gt;,
 ## #   ...26 &lt;lgl&gt;, ...27 &lt;lgl&gt;, ...28 &lt;lgl&gt;, ...29 &lt;lgl&gt;, ...30 &lt;chr&gt;</code></pre>
+<p>Get the first sheet to retrieve the dropout date</p>
+<pre class="r"><code>x &lt;- readxl::read_xlsx(file.path(paths$box, 
+                                 &quot;participants&quot;, 
+                                 &quot;Be Well Study Schedule.xlsx&quot;),
+                       trim_ws = TRUE,
+                       skip = 1,
+                       sheet = 1) %&gt;%
+  select(`Subject ID`, `Drop Out`)
+
+head(x)</code></pre>
+<pre><code>## # A tibble: 6 x 2
+##   `Subject ID` `Drop Out`         
+##   &lt;chr&gt;        &lt;dttm&gt;             
+## 1 HONC60-01    NA                 
+## 2 HONC60-02    2020-01-15 00:00:00
+## 3 HONC60-03    NA                 
+## 4 HONC60-04    2020-01-06 00:00:00
+## 5 HONC60-05    NA                 
+## 6 HONC60-06    2020-01-09 00:00:00</code></pre>
+<p>Process dropout to a logical</p>
+<pre class="r"><code>do &lt;- 
+  x %&gt;%
+  mutate(dropout = if_else(is.na(`Drop Out`),
+                           true = FALSE,
+                           false = TRUE)) %&gt;%
+  select(-`Drop Out`)</code></pre>
 <pre class="r"><code>df &lt;- 
   y %&gt;%
   mutate(recruitment.style = if_else(`how did you hear about us?` == &quot;LCSC&quot;,
                                      true = &quot;in person&quot;,
-                                     false = &quot;social media&quot;),
-         dropout = if_else(is.na(`V1 Blood`),
-                           true = TRUE,
-                           false = FALSE),
+                                     false = &quot;social media&quot;,
+                                     missing = &quot;unknown&quot;),
          across(c(&quot;Gender&quot;, &quot;Smoking status&quot;, &quot;Race/ethnicity&quot;), tolower),
          `Race/ethnicity` = if_else(`Race/ethnicity` == &quot;white&quot;,
                                     true = &quot;caucasian&quot;,
@@ -418,12 +442,12 @@ summary {
          `Race/ethnicity` = if_else(`Race/ethnicity` == &quot;african&quot;,
                                     true = &quot;african american&quot;,
                                     false = `Race/ethnicity`),
-         across(c(&quot;Gender&quot;, &quot;Smoking status&quot;, &quot;Race/ethnicity&quot;, &quot;dropout&quot;),
+         across(c(&quot;Gender&quot;, &quot;Smoking status&quot;, &quot;Race/ethnicity&quot;),
                 as.factor)
-         )
-  
-
-head(df)</code></pre>
+         ) %&gt;%
+  left_join(do)</code></pre>
+<pre><code>## Joining, by = &quot;Subject ID&quot;</code></pre>
+<pre class="r"><code>head(df)</code></pre>
 <pre><code>## # A tibble: 6 x 32
 ##   `Subject ID` Gender `Smoking status`   Age `Race/ethnicity` `how did you he…
 ##   &lt;chr&gt;        &lt;fct&gt;  &lt;fct&gt;            &lt;dbl&gt; &lt;fct&gt;            &lt;chr&gt;           
@@ -439,7 +463,7 @@ head(df)</code></pre>
 ## #   U1-10` &lt;chr&gt;, `V3 Blood` &lt;chr&gt;, `V4 S1, S2` &lt;chr&gt;, `V4 St1-9` &lt;chr&gt;, `V4
 ## #   U1-10` &lt;chr&gt;, `V4 Blood` &lt;chr&gt;, Notes &lt;chr&gt;, ...24 &lt;lgl&gt;, ...25 &lt;lgl&gt;,
 ## #   ...26 &lt;lgl&gt;, ...27 &lt;lgl&gt;, ...28 &lt;lgl&gt;, ...29 &lt;lgl&gt;, ...30 &lt;chr&gt;,
-## #   recruitment.style &lt;chr&gt;, dropout &lt;fct&gt;</code></pre>
+## #   recruitment.style &lt;chr&gt;, dropout &lt;lgl&gt;</code></pre>
 <pre class="r"><code>table(df$`how did you hear about us?`)</code></pre>
 <pre><code>## 
 ##    Craigslist   Facebook ad            FB    FB- sister          LCSC 
@@ -454,19 +478,19 @@ head(df)</code></pre>
 <pre><code>##               
 ##                FALSE TRUE
 ##   in person       15   37
-##   social media    21   10</code></pre>
+##   social media    24    7</code></pre>
 <pre class="r"><code>fisher.test(df$recruitment.style, df$dropout)</code></pre>
 <pre><code>## 
 ##  Fisher&#39;s Exact Test for Count Data
 ## 
 ## data:  df$recruitment.style and df$dropout
-## p-value = 0.0006754
+## p-value = 2.912e-05
 ## alternative hypothesis: true odds ratio is not equal to 1
 ## 95 percent confidence interval:
-##  0.06548566 0.55706900
+##  0.03607548 0.36662411
 ## sample estimates:
 ## odds ratio 
-##  0.1974018</code></pre>
+##  0.1218631</code></pre>
 <p>Create a table of the results stratified by <code>recruitment.style</code>.</p>
 <pre class="r"><code>str(df$Gender)</code></pre>
 <pre><code>##  Factor w/ 2 levels &quot;female&quot;,&quot;male&quot;: 2 2 1 1 1 1 2 1 2 1 ...</code></pre>
@@ -487,7 +511,7 @@ table1</code></pre>
 ##      african american             4 (10.8)      0 ( 0.0)             
 ##      caucasian                   25 (67.6)     11 (73.3)             
 ##      decline to say               8 (21.6)      4 (26.7)             
-##   dropout = TRUE (%)             37 (71.2)     10 (32.3)   0.001</code></pre>
+##   dropout = TRUE (%)             37 (71.2)      7 (22.6)  &lt;0.001</code></pre>
 <pre class="r"><code>table1p &lt;- print(table1, printToggle = FALSE)
 
 # flextable 
@@ -579,16 +603,48 @@ kableone(table1)</code></pre>
 <tr class="odd">
 <td align="left">dropout = TRUE (%)</td>
 <td align="left">37 (71.2)</td>
-<td align="left">10 (32.3)</td>
-<td align="left">0.001</td>
+<td align="left">7 (22.6)</td>
+<td align="left">&lt;0.001</td>
 <td align="left"></td>
 </tr>
 </tbody>
 </table>
+<pre class="r"><code>print(table2)</code></pre>
+<pre><code>## a flextable object.
+## col_keys: `Variables`, `in person`, `social media`, `p`, `test` 
+## header has 2 row(s) 
+## body has 9 row(s) 
+## original dataset sample: 
+##                     Variables     in person  social media      p test
+## 1                           n            52            31            
+## 2             Age (mean (SD))  67.26 (5.77)  63.68 (6.77)  0.017     
+## 3           Gender = male (%)    18 (40.0)     13 (41.9)   1.000     
+## 4 Smoking status = former (%)    30 (68.2)     16 (51.6)   0.226     
+## 5          Race/ethnicity (%)                              0.408</code></pre>
 <pre class="r"><code>tab3Mat &lt;- print(table1, quote = FALSE, noSpaces = TRUE, printToggle = FALSE)
 
 ## Save to a CSV file
 write.csv(tab3Mat, file = &quot;../data/derived/demographics-table.csv&quot;)</code></pre>
+<pre class="r"><code>table(df$`Smoking status`, df$Gender)</code></pre>
+<pre><code>##          
+##           female male
+##   current     18   11
+##   former      26   20</code></pre>
+<pre class="r"><code>on.study &lt;- 
+  df %&gt;%
+  filter(!dropout)
+
+table(on.study$`Smoking status`, on.study$Gender)</code></pre>
+<pre><code>##          
+##           female male
+##   current      6    7
+##   former      15   10</code></pre>
+<pre class="r"><code>summary(df$Age)</code></pre>
+<pre><code>##    Min. 1st Qu.  Median    Mean 3rd Qu.    Max.    NA&#39;s 
+##   53.00   60.00   66.00   65.76   70.00   86.00       9</code></pre>
+<pre class="r"><code>summary(on.study$Age)</code></pre>
+<pre><code>##    Min. 1st Qu.  Median    Mean 3rd Qu.    Max. 
+##   55.00   60.00   64.00   64.62   68.00   76.00</code></pre>
 
 
 
