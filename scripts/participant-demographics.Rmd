@@ -152,9 +152,13 @@ tab3Mat <- print(table1, quote = FALSE, noSpaces = TRUE, printToggle = FALSE)
 write.csv(tab3Mat, file = "../data/derived/demographics-table.csv")
 ```
 
+Smoking status by gender for all who consented, including those dropped out.
+
 ```{r}
 table(df$`Smoking status`, df$Gender)
 ```
+
+Smoking status by gender for those who did not drop out.
 
 ```{r}
 on.study <- 
@@ -164,11 +168,34 @@ on.study <-
 table(on.study$`Smoking status`, on.study$Gender)
 ```
 
+Ages ranges for all who consented, including those dropped out.
+
 ```{r}
 summary(df$Age)
 ```
+
+Ages ranges for those who did not drop out. 
 
 ```{r}
 summary(on.study$Age)
 ```
 
+Age mean and standard deviation for all who consented, including those dropped out.
+
+```{r}
+mean(df$Age, na.rm = TRUE)
+```
+
+```{r}
+sd(df$Age, na.rm = TRUE)
+```
+
+Age mean and standard deviation for those who did not drop out. 
+
+```{r}
+mean(on.study$Age, na.rm = TRUE)
+```
+
+```{r}
+sd(on.study$Age, na.rm = TRUE)
+```
