@@ -1,0 +1,168 @@
+---
+title: "sample-importat-to-labii"
+author: "Dan Spakowicz"
+date: "1/11/2021"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+
+## Goals: output a table of sample information to be input into labii for each patient visit
+
+### Input variables
+    1. SubjectID
+    2. date processed
+    3. time processed
+    4. Freezer
+    5. Freezer box urine
+    6. Freezer box position urine
+    7. Freezer box stool 
+    8. Freezer box position stool
+    9. Number of stool tub samples
+    10. Visit
+
+### Output
+  A table containing the rows:
+    1. 10 rows of urine samples
+        5 with formic acid
+        5 without formic acid
+    2. 2 stool vial samples
+    3. some number of stool tub samples (up to 9)
+    
+  Each of which has the columns: 
+      Name
+      SampleID
+      RecordID
+      Location
+      Position
+      Formic acid? (Yes/No)
+    
+```{r}
+if (!require("optparse")) {
+  install.packages("optparse")
+  library(optparse)
+}
+```
+
+Define the arguments
+
+```{r}
+option_list <- list(
+  make_option(c("-r", "--record_id"), type = "character", default = 75,
+              help='record ids, format is id1,id2,id3', metavar = "character"),
+  make_option(c("-n", "--next_urine_box_loc"), type = "character", default = "A1",
+              help = "next free location in the urine freezer box",
+              metavar = "character"),
+  make_option(c("-b", "--urine_freezer_box"), type = "integer", default = "1",
+              help = "urine freezer box number",
+              metavar = "character"),
+  make_option(c("-o", "--next_stool_box_loc"), type = "character", default = "A1",
+              help = "next free location in the stool freezer box",
+              metavar = "character"),
+  make_option(c("-c", "--stool_freezer_box"), type = "integer", default = "1",
+              help = "stool freezer box number",
+              metavar = "character"),
+  make_option(c("-x", "--number_stool-tub-tubes"), type = "integer", default = "9",
+              help = "number of tubes collected from the stool tub",
+              metavar = "character"),
+  make_option(c("-v", "--visit"), type = "integer", default = "1",
+              help = "visit number",
+              metavar = "character"),
+  make_option(c("-d", "--date"), type = "character", default = Sys.Date(),
+              help = "date samples were processed",
+              metavar = "character"),
+  make_option(c("-t", "--time"), type = "character", default = format(Sys.time(), "%H:%M"),
+              help = "time samples were processed",
+              metavar = "character")
+)
+```
+
+Set variables for testing
+```{r}
+# Define the record id of the person (subject ID)
+# opt$record_id <- 60
+
+```
+
+
+```{r}
+opt_parser <- OptionParser(option_list = option_list)
+opt <- parse_args(opt_parser)
+
+if (is.null(opt$record_id)){
+  print_help(opt_parser)
+  stop("At least one record id must be supplied", call.=FALSE)
+}
+
+# Convert record_id
+try({
+  opt$record_id <- as.character(
+    unlist(
+      strsplit(opt$record_id, split = ",")
+    )
+  )
+})
+```
+
+Create a matrix of samples
+
+```{r}
+s.fields <- c("name", "patient", "record_id", "freezer_box", "box_position", "date_processed",
+              "time_processed", "project")
+
+```
+
+First create a table for the urine samples
+
+```{r}
+ur <- matrix(nrow = length(opt$record_id) * 10, ncol = length(s.fields))
+
+ur <- as.data.frame(ur)
+
+names(ur) <- s.fields
+
+ur$record_id <- rep(opt$record_id, each = 10)
+ur$record_id <- paste0("HONC60-", samp$record_id)
+ur$patient <- ur$record_id
+
+ur$freezer_box <- paste0("BEWELL-Urine Freezer Box ", opt$urine_freezer_box)
+
+# box position
+#
+box_map <- paste(rep(LETTERS[1:9], each = 9), rep(seq(1:9), 9), sep = "")
+start_loc <- grep(opt$next_box_loc, box_map)
+ur$box_position <- box_map[start_loc:(start_loc + (nrow(samp) - 1))]
+
+# Date
+samp$date_processed <- opt$date
+samp$date_processed <- as.Date(samp$date_processed, format = "%F")
+
+# Time
+samp$time_processed <- opt$time
+
+# Project
+samp$project <- opt$project
+
+# Sample ID
+#
+samp$sample_id <- paste(samp$record_id, format(samp$date_processed, "%y%m%d"), seq(1:10), sep = ".")
+
+# Name (label in Labii)
+samp$name <- paste(samp$project, samp$record_id, paste(samp$freezer_box,
+                                                       samp$box_position, sep = "."), samp$date_processed, sep = " ")
+
+
+```
+
+# Write output
+
+```{r}
+write.table(samp,
+            file = paste(as.character(samp$date_processed[1]), opt$out_samples, sep = "_"),
+            sep = "\t", row.names = FALSE, quote = FALSE)
+```
+
+    
