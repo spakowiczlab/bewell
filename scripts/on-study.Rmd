@@ -28,7 +28,7 @@ head(x)
 ```{r}
 xs <- 
   x %>%
-  select(`Subject ID`, `Consented date`, `Visit 1`, `Redoing V1`, `Visit 2`, `Visit 3`, `Redoing V3`, `Visit 4`)
+  select(`Subject ID`, `Consented date`, `Visit 1`, `Redoing V1`, `Visit 2`, `Visit 3`, `Redoing V3`, `Visit 4`, `Drop Out`)
 
 summary(xs)
 ```
@@ -71,9 +71,35 @@ t.on.study <-
   data.frame
 
 true.on.study <- t.on.study[2, 2]
+true.on.study
 ```
 
-There are `r true.on.study` participants currently on study.
+There are `r true.on.study` participants currently on study, i.e. past V1 and before V4.
+
+```{r}
+gc <- 
+  xs %>%
+  filter(is.na(`Drop Out`)) %>%
+  select(-`Consented date`,-`Drop Out`, -starts_with("Redoing")) %>%
+  gather(-`Subject ID`, key = "event", value = "date") %>%
+  mutate(date.passed = if_else(date < as.POSIXct(Sys.Date()),
+                               true = TRUE,
+                               false = FALSE,
+                               missing = FALSE)) %>%
+  filter(date.passed == FALSE)
+
+n.consented.on.study <- 
+  gc %>%
+  select(`Subject ID`) %>%
+  unique %>%
+  count
+
+n.consented.on.study
+```
+
+There are `r n.consented.on.study$n` participants currently on study, i.e. consented and before V4.
+
+# Number of participants who have completed the study
 
 ```{r}
 t.completed <- 
@@ -86,8 +112,11 @@ true.completed <- t.completed[2,2]
 ```
 There are `r as.numeric(true.completed)` participants who have completed the study.
 
+
+
 ```{r}
 left.to.complete <- 42 - (true.on.study + true.completed)
+left.to.complete
 ```
 
 There are `r left.to.complete` participants left to fully completed the study.
@@ -100,24 +129,35 @@ left.to.enroll <- left.to.complete / dropout.freq
 
 With a dropout frequency of `r dropout.freq`, there are `r left.to.enroll` participants left to enroll.
 
-# Gift cards to purchase by Dec 14 
+# Gift cards left to purchase
 
-How many gift cards do we expect to need between now and Jan 7?
+How many gift cards do we expect to need to buy to complete the study?
 
 ```{r}
 gc <- 
-  xd %>%
-  filter(date > as.POSIXct(Sys.Date())) %>%
-  mutate(before.reoder = date < as.POSIXct("2021-01-07", tz = "EST")) %>%
-  count(before.reoder)
+  xs %>%
+  filter(is.na(`Drop Out`)) %>%
+  select(-`Consented date`,-`Drop Out`, -starts_with("Redoing")) %>%
+  gather(-`Subject ID`, key = "event", value = "date") %>%
+  mutate(date.passed = if_else(date < as.POSIXct(Sys.Date()),
+                               true = TRUE,
+                               false = FALSE,
+                               missing = FALSE)) %>%
+  filter(date.passed == FALSE)
 
-gc
 ```
-We will need `r gc$n[grep("TRUE", gc$before.reoder)]` gift cards between `r as.Date(Sys.Date())` and Jan 7, when we are able to place an additional order.
-
-
 
 ```{r}
+amazon <- 31
+walmart <- 19
+
+nrow(gc) - (amazon + walmart)
+```
+
+
+# Visualizing the completeness of biospecimen collections
+
+```{r, echo=FALSE}
 y <- readxl::read_xlsx(file.path(paths$box, 
                                  "participants", 
                                  "Be Well Study Schedule.xlsx"),
@@ -127,13 +167,13 @@ y <- readxl::read_xlsx(file.path(paths$box,
 head(y)
 ```
 
-```{r}
+```{r, echo=FALSE}
 z <- full_join(x, y)
 
-summary(z)
+head(z)
 ```
 
-```{r}
+```{r, echo=FALSE}
 v1 <- 
   z %>%
   select(`Subject ID`, contains(c("Visit 1", "V1"))) %>%
@@ -141,10 +181,10 @@ v1 <-
                             true = `Redoing V1`,
                             false =  `Visit 1`)) %>%
   select(-`Visit 1`, -`Redoing V1`) %>%
-  mutate(visit = ifelse(is.na(date), NA, 1)) %>%
-  rename(`V1 S1, S2` = "stool.vial",
-         `V1 St1-9` = "stool.tub",
-         `V1 U1-10` = "urine")
+  mutate(visit = ifelse(is.na(date), NA, 1))
+  # rename(`V1 S1, S2` = "stool.vial",
+  #        `V1 St1-9` = "stool.tub",
+  #        `V1 U1-10` = "urine")
   
 
 
