@@ -28,7 +28,12 @@ head(x)
 ```{r}
 xs <- 
   x %>%
-  select(`Subject ID`, `Consented date`, `Visit 1`, `Redoing V1`, `Visit 2`, `Visit 3`, `Redoing V3`, `Visit 4`, `Drop Out`)
+  select(`Subject ID`, `Consented date`, `Visit 1`, `Redoing V1`, `Visit 2`, `Visit 3`, `Redoing V3`, `Visit 4`, `Drop Out`) %>%
+  rename("Repeat V1" = "Redoing V1",
+         "Repeat V3" = "Redoing V3") %>%
+  arrange(`Consented date`) %>%
+  mutate(id = seq(1, nrow(x))) %>%
+  select(-`Subject ID`)
 
 summary(xs)
 ```
@@ -36,7 +41,7 @@ summary(xs)
 ```{r}
 xsl <- 
   xs %>%
-  gather(-`Subject ID`, key = "event", value = "date")
+  gather(-id, key = "event", value = "date")
 ```
 
 ```{r}
@@ -49,14 +54,20 @@ xd <- readRDS(file.path(paths$derived, "study-dates.RDS"))
 
 ```{r}
 xd %>%
-  ggplot(aes(date, `Subject ID`)) +
+  ggplot(aes(date, reorder(id, -id))) +
   geom_point(aes(color = event)) +
   theme_bw() +
   theme(axis.text.y = element_blank()) +
   geom_vline(xintercept = as.POSIXct(Sys.Date()), 
              color = "red", linetype = "dotted") +
+  geom_vline(xintercept = as.POSIXct(max(xs$`Visit 1`, na.rm = TRUE) +
+                                       lubridate::weeks(10)), 
+             color = "blue", linetype = "dotted") +
   ggsave("../figures/on-study.png", height = 3, width = 5)
 
+as.POSIXct(max(xs$`Visit 1`, na.rm = TRUE) + lubridate::weeks(10))
+
+max(xs$`Visit 1`, na.rm = TRUE)
 ```
 
 ```{r}
@@ -81,7 +92,7 @@ gc <-
   xs %>%
   filter(is.na(`Drop Out`)) %>%
   select(-`Consented date`,-`Drop Out`, -starts_with("Redoing")) %>%
-  gather(-`Subject ID`, key = "event", value = "date") %>%
+  gather(-id, key = "event", value = "date") %>%
   mutate(date.passed = if_else(date < as.POSIXct(Sys.Date()),
                                true = TRUE,
                                false = FALSE,
@@ -90,7 +101,7 @@ gc <-
 
 n.consented.on.study <- 
   gc %>%
-  select(`Subject ID`) %>%
+  select(id) %>%
   unique %>%
   count
 
@@ -138,7 +149,7 @@ gc <-
   xs %>%
   filter(is.na(`Drop Out`)) %>%
   select(-`Consented date`,-`Drop Out`, -starts_with("Redoing")) %>%
-  gather(-`Subject ID`, key = "event", value = "date") %>%
+  gather(-id, key = "event", value = "date") %>%
   mutate(date.passed = if_else(date < as.POSIXct(Sys.Date()),
                                true = TRUE,
                                false = FALSE,

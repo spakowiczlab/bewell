@@ -13,7 +13,8 @@ library(tidyverse)
 
 ```{r}
 x <- read_csv("../data/raw/2020-09-11_facebook-clicks.csv") %>%
-  mutate(Date = as.Date(Date, format = "%d-%b")) %>%
+  mutate(Date = gsub("(.*)", "\\1-2020", Date)) %>%
+  mutate(Date = as.Date(Date, format = "%d-%b-%Y")) %>%
   mutate(Image = "People") %>%
   rename("Cost Per Result" = "Cost per result")
 ```
@@ -57,8 +58,9 @@ No, the cost per click did not change significantly over time.
 ```{r}
 y <- read_csv("../data/raw/2020-10-20_facebook-clicks.csv") %>%
   select(-X5) %>%
-  mutate(Date = as.Date(Date, format = "%d-%b")) %>%
-  rename("Cost Per Result" = "Cost Per result")
+  mutate(Date = gsub("(.*)", "\\1-2020", Date)) %>%
+  mutate(Date = as.Date(Date, format = "%d-%b-%Y")) %>%
+  rename("Cost Per Result" = "Cost Per result") 
 
 cleanCost <- function(vec) {
   gsub("^.*\\$.*(\\d\\.\\d+)", "\\1", vec) %>%
@@ -73,7 +75,29 @@ head(y2)
 ```
 
 ```{r}
-z <- bind_rows(x, y2)
+a <- read_csv("../data/raw/2021-01-27_facebook-clicks.csv") %>%
+  mutate(Date = gsub("(.*)", "\\1-2021", Date)) %>%
+  mutate(Date = as.Date(Date, format = "%d-%b-%Y")) %>%
+  mutate(Image = "Berries") %>%
+  mutate_at(c("Cost Per Result", "Total Daily Cost"), cleanCost)
+```
+
+
+# Final Ad Campaign
+
+```{r}
+b <- read_csv("../data/raw/2021-02-24_facebook-clicks.csv") %>%
+  mutate(Date = gsub("(.*)", "\\1-2021", Date)) %>%
+  mutate(Date = as.Date(Date, format = "%d-%b-%Y")) %>%
+  mutate(Image = "Berries") %>%
+  rename("Cost Per Result" = "Cost per result") %>%
+  mutate_at(c("Cost Per Result", "Total Daily Cost"), cleanCost)
+
+head(b)
+```
+
+```{r}
+z <- bind_rows(x, y2, a, b)
 
 summary(z)
 ```
