@@ -1,0 +1,197 @@
+---
+title: "sample-inventory"
+author: "Dan Spakowicz"
+date: "3/5/2021"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+
+library(readxl)
+library(tidyverse)
+library(knitr)
+
+source("00-paths.R")
+```
+
+# Introduction
+
+```{r}
+# Read in worksheet 1
+x <- readxl::read_xlsx(file.path(paths$box, 
+                                 "participants", 
+                                 "Be Well Study Schedule.xlsx"),
+                       skip = 1, 
+                       trim_ws = TRUE,
+                       sheet = 1) %>%
+  select(`Subject ID`, `Consented date`, `Visit 1`, `Redoing V1`, `Visit 2`, 
+         `Visit 3`, `Redoing V3`, `Visit 4`, `Drop Out`)
+
+# Read in worksheet 2
+y <- readxl::read_xlsx(file.path(paths$box, 
+                                 "participants", 
+                                 "Be Well Study Schedule.xlsx"),
+                       trim_ws = TRUE,
+                       sheet = 2) %>%
+  full_join(x) %>%
+  mutate(`Visit 1` = if_else(is.na(`Redoing V1`),
+                             true = `Visit 1`,
+                             false = `Redoing V1`),
+         `Visit 3` = if_else(is.na(`Redoing V3`),
+                             true = `Visit 3`,
+                             false = `Redoing V3`)) %>%
+  select(-starts_with("Redoing"), -starts_with("..."), -Notes) %>%
+  arrange(`Consented date`) %>%
+  mutate(id = seq(1, nrow(.))) %>%
+  drop_na(`Consented date`)
+
+head(y)
+```
+
+
+```{r}
+l <- list()
+
+for (i in 1:4) {
+  l[[i]] <- 
+    y %>%
+    select(`id`, contains(c(paste0("Visit ", i),
+                            paste0("V", i)))) %>%
+    rename("date" = paste0("Visit ", i)) %>%
+    drop_na(date) %>%
+    mutate(visit = i) %>%
+    rename("stool.vial" = paste0("V", i, " S1, S2"),
+           "stool.tub" = paste0("V", i, " St1-9"),
+           "urine" = paste0("V", i, " U1-10"),
+           "blood" = paste0("V", i, " Blood"))
+}
+
+dfl <- bind_rows(l)
+```
+
+Change the X's to a logical and remove other labels.
+
+```{r}
+makeLogical <- function(x) if_else(x == "X", 
+                                   true = TRUE,
+                                   false = FALSE,
+                                   missing = FALSE)
+
+dfll <- 
+  dfl %>%
+  mutate_at(.vars = c("stool.vial", "stool.tub", "urine", "blood"), 
+            .funs = makeLogical)
+```
+
+Gather the biospecimen cols for visualization with geom tile
+```{r}
+long.dfll <- 
+  dfll %>%
+  gather(-id, -visit, -date, key = "biospecimen", value = "collected")
+
+head(long.dfll)
+```
+
+Remove ids without any samples
+```{r}
+some.samp <- 
+  long.dfll %>%
+  group_by(id) %>%
+  filter(any(collected)) %>%
+  mutate(id = as.factor(id)) %>%
+  arrange(collected)
+```
+
+```{r}
+some.samp %>%
+  group_by(id, biospecimen) %>%
+  summarize(n = sum(collected))
+```
+
+
+
+```{r}
+long.dfll %>%
+  ggplot(aes(x = date, y = id)) +
+  geom_jitter(aes(shape = collected, color = biospecimen))
+
+some.samp %>%
+  mutate(visit = paste0("Visit ", visit)) %>%
+  ggplot(aes(x = biospecimen, y = id)) +
+  geom_tile(aes(fill = collected)) +
+  facet_wrap(~visit) +
+  theme_bw() +
+  theme(axis.text.y = element_blank()) +
+  ggsave("../figures/biospecimen-inventory_tile.png", height = 4, width = 6)
+
+```
+```{r}
+summary.samp <- 
+  some.samp %>%
+  group_by(id, biospecimen) %>%
+  summarize(n = sum(collected))
+
+head(summary.samp)
+```
+
+```{r}
+sum.ordering <- 
+  summary.samp %>%
+  group_by(id) %>%
+  summarise(sum = sum(n)) %>%
+  arrange(-sum)
+
+
+summary.samp.w <- 
+summary.samp %>%
+  spread(key = "biospecimen", value = "n") %>%
+  full_join(sum.ordering) %>%
+  arrange(-sum)
+summary.samp.w 
+```
+
+```{r}
+summary.samp.w %>%
+  filter(sum >= 12) %>%
+  nrow
+```
+
+Breakdown of blood sample completeness
+```{r}
+# summary.samp
+# summary.samp %>%
+#   mutate(n = as.factor(n)) %>%
+#   ungroup() %>%
+#   group_by(biospecimen, n) %>%
+#   summarize(num.participants = count(id))
+
+tb <- data.frame(table(summary.samp.w$blood)) %>%
+  rename("Blood" = "Freq",
+         "Number of Samples" = "Var1")
+tsv <- data.frame(table(summary.samp.w$stool.vial)) %>%
+  rename("Stool Vial" = "Freq",
+         "Number of Samples" = "Var1")
+tst <- data.frame(table(summary.samp.w$stool.tub)) %>%
+  rename("Stool Tub" = "Freq",
+         "Number of Samples" = "Var1")
+tu <- data.frame(table(summary.samp.w$urine)) %>%
+  rename("Urine" = "Freq",
+         "Number of Samples" = "Var1")
+
+sum.tab <- 
+  full_join(tb, tsv) %>%
+  full_join(tst) %>%
+  full_join(tu)
+
+kable(sum.tab)
+```
+
+Write table output
+
+```{r}
+write.csv(x = sum.tab,
+          file = "../data/derived/biospecimen-quantities.csv",
+          row.names = FALSE)
+```
+

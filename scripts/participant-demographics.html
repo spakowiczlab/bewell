@@ -466,31 +466,31 @@ head(x)</code></pre>
 ## #   recruitment.style &lt;chr&gt;, dropout &lt;lgl&gt;</code></pre>
 <pre class="r"><code>table(df$`how did you hear about us?`)</code></pre>
 <pre><code>## 
-##    Craigslist   Facebook ad            FB    FB- sister          LCSC 
-##             1             1            17             1            52 
-## ResearchMatch            RM 
-##             1            10</code></pre>
+## CarePoint East    Facebook ad             FB     FB- sister           LCSC 
+##              2              1             30              1             52 
+##  ResearchMatch             RM 
+##              1             10</code></pre>
 <pre class="r"><code>table(df$recruitment.style)</code></pre>
 <pre><code>## 
 ##    in person social media 
-##           52           31</code></pre>
+##           52           45</code></pre>
 <pre class="r"><code>table(df$recruitment.style, df$dropout)</code></pre>
 <pre><code>##               
 ##                FALSE TRUE
-##   in person       11   41
-##   social media    23    7</code></pre>
+##   in person        9   43
+##   social media    33   11</code></pre>
 <pre class="r"><code>fisher.test(df$recruitment.style, df$dropout)</code></pre>
 <pre><code>## 
 ##  Fisher&#39;s Exact Test for Count Data
 ## 
 ## data:  df$recruitment.style and df$dropout
-## p-value = 1.465e-06
+## p-value = 1.154e-08
 ## alternative hypothesis: true odds ratio is not equal to 1
 ## 95 percent confidence interval:
-##  0.02383576 0.26714986
+##  0.02284109 0.20670264
 ## sample estimates:
 ## odds ratio 
-## 0.08494842</code></pre>
+##   0.072394</code></pre>
 <p>Create a table of the results stratified by <code>recruitment.style</code>.</p>
 <pre class="r"><code>str(df$Gender)</code></pre>
 <pre><code>##  Factor w/ 2 levels &quot;female&quot;,&quot;male&quot;: 2 2 1 1 1 1 2 1 2 1 ...</code></pre>
@@ -503,15 +503,15 @@ catVars &lt;- c(&quot;Gender&quot;, &quot;Smoking status&quot;, &quot;Race/ethni
 table1</code></pre>
 <pre><code>##                              Stratified by recruitment.style
 ##                               in person     social media  p      test
-##   n                              52            31                    
-##   Age (mean (SD))             67.11 (5.68)  63.68 (6.77)   0.019     
-##   Gender = male (%)              18 (40.0)     13 (41.9)   1.000     
-##   Smoking status = former (%)    30 (68.2)     16 (51.6)   0.226     
-##   Race/ethnicity (%)                                       0.408     
+##   n                              52            45                    
+##   Age (mean (SD))             67.11 (5.68)  63.13 (6.23)   0.002     
+##   Gender = male (%)              18 (40.0)     17 (37.8)   1.000     
+##   Smoking status = former (%)    30 (68.2)     27 (60.0)   0.560     
+##   Race/ethnicity (%)                                       0.418     
 ##      african american             4 (10.8)      0 ( 0.0)             
-##      caucasian                   25 (67.6)     11 (73.3)             
-##      decline to say               8 (21.6)      4 (26.7)             
-##   dropout = TRUE (%)             41 (78.8)      7 (23.3)  &lt;0.001</code></pre>
+##      caucasian                   25 (67.6)     10 (71.4)             
+##      decline to say               8 (21.6)      4 (28.6)             
+##   dropout = TRUE (%)             43 (82.7)     11 (25.0)  &lt;0.001</code></pre>
 <pre class="r"><code>table1p &lt;- print(table1, printToggle = FALSE)
 
 # flextable 
@@ -547,36 +547,36 @@ kableone(table1)</code></pre>
 <tr class="odd">
 <td align="left">n</td>
 <td align="left">52</td>
-<td align="left">31</td>
+<td align="left">45</td>
 <td align="left"></td>
 <td align="left"></td>
 </tr>
 <tr class="even">
 <td align="left">Age (mean (SD))</td>
 <td align="left">67.11 (5.68)</td>
-<td align="left">63.68 (6.77)</td>
-<td align="left">0.019</td>
+<td align="left">63.13 (6.23)</td>
+<td align="left">0.002</td>
 <td align="left"></td>
 </tr>
 <tr class="odd">
 <td align="left">Gender = male (%)</td>
 <td align="left">18 (40.0)</td>
-<td align="left">13 (41.9)</td>
+<td align="left">17 (37.8)</td>
 <td align="left">1.000</td>
 <td align="left"></td>
 </tr>
 <tr class="even">
 <td align="left">Smoking status = former (%)</td>
 <td align="left">30 (68.2)</td>
-<td align="left">16 (51.6)</td>
-<td align="left">0.226</td>
+<td align="left">27 (60.0)</td>
+<td align="left">0.560</td>
 <td align="left"></td>
 </tr>
 <tr class="odd">
 <td align="left">Race/ethnicity (%)</td>
 <td align="left"></td>
 <td align="left"></td>
-<td align="left">0.408</td>
+<td align="left">0.418</td>
 <td align="left"></td>
 </tr>
 <tr class="even">
@@ -589,21 +589,21 @@ kableone(table1)</code></pre>
 <tr class="odd">
 <td align="left">caucasian</td>
 <td align="left">25 (67.6)</td>
-<td align="left">11 (73.3)</td>
+<td align="left">10 (71.4)</td>
 <td align="left"></td>
 <td align="left"></td>
 </tr>
 <tr class="even">
 <td align="left">decline to say</td>
 <td align="left">8 (21.6)</td>
-<td align="left">4 (26.7)</td>
+<td align="left">4 (28.6)</td>
 <td align="left"></td>
 <td align="left"></td>
 </tr>
 <tr class="odd">
 <td align="left">dropout = TRUE (%)</td>
-<td align="left">41 (78.8)</td>
-<td align="left">7 (23.3)</td>
+<td align="left">43 (82.7)</td>
+<td align="left">11 (25.0)</td>
 <td align="left">&lt;0.001</td>
 <td align="left"></td>
 </tr>
@@ -616,11 +616,11 @@ kableone(table1)</code></pre>
 ## body has 9 row(s) 
 ## original dataset sample: 
 ##                     Variables     in person  social media      p test
-## 1                           n            52            31            
-## 2             Age (mean (SD))  67.11 (5.68)  63.68 (6.77)  0.019     
-## 3           Gender = male (%)    18 (40.0)     13 (41.9)   1.000     
-## 4 Smoking status = former (%)    30 (68.2)     16 (51.6)   0.226     
-## 5          Race/ethnicity (%)                              0.408</code></pre>
+## 1                           n            52            45            
+## 2             Age (mean (SD))  67.11 (5.68)  63.13 (6.23)  0.002     
+## 3           Gender = male (%)    18 (40.0)     17 (37.8)   1.000     
+## 4 Smoking status = former (%)    30 (68.2)     27 (60.0)   0.560     
+## 5          Race/ethnicity (%)                              0.418</code></pre>
 <pre class="r"><code>tab3Mat &lt;- print(table1, quote = FALSE, noSpaces = TRUE, printToggle = FALSE)
 
 ## Save to a CSV file
@@ -629,8 +629,8 @@ write.csv(tab3Mat, file = &quot;../data/derived/demographics-table.csv&quot;)</c
 <pre class="r"><code>table(df$`Smoking status`, df$Gender)</code></pre>
 <pre><code>##          
 ##           female male
-##   current     18   11
-##   former      26   20</code></pre>
+##   current     20   12
+##   former      34   23</code></pre>
 <p>Smoking status by gender for those who did not drop out.</p>
 <pre class="r"><code>on.study &lt;- 
   df %&gt;%
@@ -639,26 +639,26 @@ write.csv(tab3Mat, file = &quot;../data/derived/demographics-table.csv&quot;)</c
 table(on.study$`Smoking status`, on.study$Gender)</code></pre>
 <pre><code>##          
 ##           female male
-##   current      5    7
-##   former      12    9</code></pre>
+##   current      5    8
+##   former      17   12</code></pre>
 <p>Ages ranges for all who consented, including those dropped out.</p>
 <pre class="r"><code>summary(df$Age)</code></pre>
 <pre><code>##    Min. 1st Qu.  Median    Mean 3rd Qu.    Max.    NA&#39;s 
-##   53.00   60.00   65.50   65.71   70.00   86.00       7</code></pre>
+##   53.00   59.00   65.00   65.12   69.75   86.00       7</code></pre>
 <p>Ages ranges for those who did not drop out.</p>
 <pre class="r"><code>summary(on.study$Age)</code></pre>
 <pre><code>##    Min. 1st Qu.  Median    Mean 3rd Qu.    Max. 
-##   55.00   59.25   64.00   64.65   68.75   76.00</code></pre>
+##   55.00   59.00   64.00   64.36   68.00   76.00</code></pre>
 <p>Age mean and standard deviation for all who consented, including those dropped out.</p>
 <pre class="r"><code>mean(df$Age, na.rm = TRUE)</code></pre>
-<pre><code>## [1] 65.71053</code></pre>
+<pre><code>## [1] 65.12222</code></pre>
 <pre class="r"><code>sd(df$Age, na.rm = TRUE)</code></pre>
-<pre><code>## [1] 6.3347</code></pre>
+<pre><code>## [1] 6.25278</code></pre>
 <p>Age mean and standard deviation for those who did not drop out.</p>
 <pre class="r"><code>mean(on.study$Age, na.rm = TRUE)</code></pre>
-<pre><code>## [1] 64.64706</code></pre>
+<pre><code>## [1] 64.35714</code></pre>
 <pre class="r"><code>sd(on.study$Age, na.rm = TRUE)</code></pre>
-<pre><code>## [1] 5.799072</code></pre>
+<pre><code>## [1] 5.595388</code></pre>
 
 
 

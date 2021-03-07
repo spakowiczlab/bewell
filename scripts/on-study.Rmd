@@ -10,6 +10,7 @@ knitr::opts_chunk$set(echo = TRUE)
 
 library(readxl)
 library(tidyverse)
+library(lubridate)
 
 source("00-paths.R")
 ```
@@ -29,11 +30,15 @@ head(x)
 xs <- 
   x %>%
   select(`Subject ID`, `Consented date`, `Visit 1`, `Redoing V1`, `Visit 2`, `Visit 3`, `Redoing V3`, `Visit 4`, `Drop Out`) %>%
-  rename("Repeat V1" = "Redoing V1",
-         "Repeat V3" = "Redoing V3") %>%
+    mutate(`Visit 1` = if_else(is.na(`Redoing V1`),
+                             true = `Visit 1`,
+                             false = `Redoing V1`),
+         `Visit 3` = if_else(is.na(`Redoing V3`),
+                             true = `Visit 3`,
+                             false = `Redoing V3`)) %>%
   arrange(`Consented date`) %>%
   mutate(id = seq(1, nrow(x))) %>%
-  select(-`Subject ID`)
+  select(-`Subject ID`, -starts_with("Redoing")) 
 
 summary(xs)
 ```
@@ -53,6 +58,8 @@ xd <- readRDS(file.path(paths$derived, "study-dates.RDS"))
 ```
 
 ```{r}
+end.date <- as.POSIXct(max(xs$`Visit 1`, na.rm = TRUE) + lubridate::weeks(10))
+
 xd %>%
   ggplot(aes(date, reorder(id, -id))) +
   geom_point(aes(color = event)) +
@@ -60,14 +67,14 @@ xd %>%
   theme(axis.text.y = element_blank()) +
   geom_vline(xintercept = as.POSIXct(Sys.Date()), 
              color = "red", linetype = "dotted") +
-  geom_vline(xintercept = as.POSIXct(max(xs$`Visit 1`, na.rm = TRUE) +
-                                       lubridate::weeks(10)), 
+  geom_vline(xintercept = end.date, 
              color = "blue", linetype = "dotted") +
-  ggsave("../figures/on-study.png", height = 3, width = 5)
-
-as.POSIXct(max(xs$`Visit 1`, na.rm = TRUE) + lubridate::weeks(10))
-
-max(xs$`Visit 1`, na.rm = TRUE)
+  annotate(geom = "text", 
+           label = paste0("Study end = ", format(end.date, "%b %d")),
+           x = end.date - weeks(16), y = max(xd$id) - 3) +
+  ylab("Participant") +
+  xlab("Date") +
+  ggsave("../figures/on-study.png", height = 4, width = 6)
 ```
 
 ```{r}
@@ -184,21 +191,5 @@ z <- full_join(x, y)
 head(z)
 ```
 
-```{r, echo=FALSE}
-v1 <- 
-  z %>%
-  select(`Subject ID`, contains(c("Visit 1", "V1"))) %>%
-  mutate(date = if_else(condition = !is.na(`Redoing V1`), 
-                            true = `Redoing V1`,
-                            false =  `Visit 1`)) %>%
-  select(-`Visit 1`, -`Redoing V1`) %>%
-  mutate(visit = ifelse(is.na(date), NA, 1))
-  # rename(`V1 S1, S2` = "stool.vial",
-  #        `V1 St1-9` = "stool.tub",
-  #        `V1 U1-10` = "urine")
-  
 
-
-
-```
 
