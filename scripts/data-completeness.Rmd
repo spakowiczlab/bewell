@@ -1,5 +1,5 @@
 ---
-title: "sample-inventory"
+title: "data-completeness"
 author: "Dan Spakowicz"
 date: "3/5/2021"
 output: html_document
@@ -21,22 +21,23 @@ source("00-paths.R")
 # Read in worksheet 1
 x <- readxl::read_xlsx(file.path(paths$box, 
                                  "participants", 
-                                 "bewell_studyschedule-v1.xlsx"),
+                                 "bewell_studyschedule mb.xlsx"),
                        skip = 1, 
                        trim_ws = TRUE,
                        sheet = 1) %>%
   select(`Subject ID`, `Consented date`, `Visit 1`, `Redoing V1`, `Visit 2`, 
          `Visit 3`, `Redoing V3`, `Visit 4`, `Drop Out`)
 
+str(x$`Visit 4`)
+
 # Read in worksheet 2
 y <- readxl::read_xlsx(file.path(paths$box, 
                                  "participants", 
-                                 "bewell_studyschedule-v1.xlsx"),
+                                 "bewell_studyschedule mb.xlsx"),
                        trim_ws = TRUE,
                        sheet = 2) %>%
-  rename("Subject ID" = "Subject ID...1") %>%
-  select(-"Visit 4") %>%
-  full_join(x) %>% 
+  select(-`Visit 4`) %>%
+  full_join(x) %>%
   mutate(`Visit 1` = if_else(is.na(`Redoing V1`),
                              true = `Visit 1`,
                              false = `Redoing V1`),
@@ -90,27 +91,22 @@ Gather the biospecimen cols for visualization with geom tile
 ```{r}
 long.dfll <- 
   dfll %>%
-  select(id, visit, date, stool.vial, stool.tub, urine, blood) %>%
-  gather(-id, -visit, -date, key = "biospecimen", value = "collected") %>%
-  mutate(collected = as.logical(collected))
+  gather(-id, -visit, -date, key = "biospecimen", value = "collected")
 
 head(long.dfll)
 
 ```
 
 How many stool vials to sequence?
-
 ```{r}
 long.dfll %>%
   filter(biospecimen == "stool.vial") %>%
   summarize(total.collected = sum(collected),
             percent.collected = sum(collected) / length(collected))
-
 ```
 
 
 Remove ids without any samples
-
 ```{r}
 some.samp <- 
   long.dfll %>%
