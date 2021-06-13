@@ -75,7 +75,7 @@ dfl <- bind_rows(l)
 Change the X's to a logical and remove other labels.
 
 ```{r}
-makeLogical <- function(x) if_else(x == "X", 
+makeLogical <- function(x) if_else(grepl("x", x, ignore.case = TRUE), 
                                    true = TRUE,
                                    false = FALSE,
                                    missing = FALSE)
@@ -143,6 +143,16 @@ some.samp %>%
   ggsave("../figures/biospecimen-inventory_tile.png", height = 4, width = 6)
 
 ```
+
+```{r}
+some.samp %>%
+  filter(biospecimen == "stool.vial") %>%
+  drop_na() %>%
+  ggplot(aes(x = visit, y = id)) +
+  geom_tile(aes(fill = collected))
+```
+
+
 ```{r}
 summary.samp <- 
   some.samp %>%
