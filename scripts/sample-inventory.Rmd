@@ -139,7 +139,8 @@ some.samp %>%
   geom_tile(aes(fill = collected)) +
   facet_wrap(~visit) +
   theme_bw() +
-  theme(axis.text.y = element_blank()) +
+  theme(axis.text.y = element_blank())
+
   ggsave("../figures/biospecimen-inventory_tile.png", height = 4, width = 6)
 
 ```
