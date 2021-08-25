@@ -1,0 +1,74 @@
+---
+title: "bewell data cleaning"
+author: "Caroline Wheeler"
+date: "8/18/2021"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+
+library(REDCapR)
+library(tidyverse)
+library(eeptools)
+
+setwd(dirname(getwd()))
+source("00-paths.R")
+```
+
+using API token to get data from redcap
+```{r}
+df <- redcap_read_oneshot(redcap_uri = "https://redcap.osumc.edu/redcap/api/",
+                                token = "1CAFA9314A9CE50CD402961B065DC9FA")$data
+```
+
+load data from T-drive
+```{r}
+df <- read.csv(file.path(paths$data, "P426HONC60BeWell_DATA_2021-08-18_0957.csv")) %>%
+  na_if("")
+```
+
+cleaning
+```{r}
+demogs <- df %>%
+  drop_na(race) %>%
+  select(subject_number, dob, race, gender, antibiotics, current_smoke, past_smoker)
+```
+
+convert DOB to age in years
+```{r}
+demogs$dob <- as.Date(demogs$dob)
+demogs$age <- floor(age_calc(demogs$dob, units = "years"))
+demogs <- demogs %>% select(-dob)
+```
+
+create smoking status variable
+```{r}
+# 0 = never smoked, 1 = past smoker, 2 = current smoker 
+demogs <- demogs %>%
+  mutate(
+    smoking_status = ifelse(demogs$current_smoke == 1, 2, ifelse(demogs$past_smoker == 1, 1, 0))
+  ) %>%
+  select(-past_smoker, -current_smoke)
+```
+
+change variable types to strings
+```{r}
+demogs2 <- demogs %>% 
+  mutate(
+    gender = ifelse(demogs$gender == 1, "male", "female"),
+    race = ifelse(demogs$race == 2, "Asian", ifelse(demogs$race == 4, "Black or African American", "White")),
+    smoking_status = ifelse(demogs$smoking_status == 1, "past smoker", ifelse(demogs$smoking_status == 2, "current smoker", "never smoked")),
+    antibiotics = 
+  )
+```
+
+demographic data? Not sure what I was doing here. come back to it?
+```{r}
+demographics <- redcap_read_oneshot(redcap_uri = "https://redcap.osumc.edu/redcap/api/",
+                                token = "1CAFA9314A9CE50CD402961B065DC9FA",
+                                )$data
+```
+
+
+
