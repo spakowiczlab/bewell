@@ -19,7 +19,7 @@ source("00-paths.R")
 using API token to get data from redcap
 ```{r}
 df <- redcap_read_oneshot(redcap_uri = "https://redcap.osumc.edu/redcap/api/",
-                                token = "1CAFA9314A9CE50CD402961B065DC9FA")$data
+                                token = "[insert token here]")$data
 ```
 
 load data from T-drive
@@ -63,12 +63,6 @@ demogs2 <- demogs %>%
   )
 ```
 
-demographic data? Not sure what I was doing here. come back to it?
-```{r}
-demographics <- redcap_read_oneshot(redcap_uri = "https://redcap.osumc.edu/redcap/api/",
-                                token = "1CAFA9314A9CE50CD402961B065DC9FA",
-                                )$data
-```
 
 
 
