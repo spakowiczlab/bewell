@@ -1,0 +1,53 @@
+---
+title: "mimic participant options"
+author: "Caroline Wheeler"
+date: "10/22/2021"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+
+library(tidyverse)
+library(readxl)
+
+source("00-paths.R")
+```
+
+read in and transform randomization data
+```{r}
+juice <- read.csv(file.path(paths$box, "P426HONC60BeWell_DATA_LABELS_2021-10-20_1538.csv")) %>%
+  select(Subject.Number, Randomized.to.receive.683.at) %>%
+  na_if("") %>%
+  drop_na() %>%
+  rename("placebo" = Randomized.to.receive.683.at)
+```
+
+read in and transform subject data for stool sample completeness
+```{r}
+subs <- read_excel(file.path(paths$box, "bewell_studyschedule-v1.xlsx"), sheet = 4) %>%
+  select(c(1:17)) %>%
+  na_if("m") %>%
+  drop_na() %>%
+  select('Subject ID')
+
+subs$Subject.Number <-as.integer(substr(subs$`Subject ID`, 8, 9))
+```
+merge
+```{r}
+juice <- merge(juice, subs)
+```
+
+get comparison groups
+```{r}
+juice <- juice %>%
+  mutate(pre = ifelse(placebo == "Week 0", paste0(juice$`Subject ID`,"-v3"), paste0(juice$`Subject ID`,"-v1"))) %>%
+  mutate(post = ifelse(placebo == "Week 0", paste0(juice$`Subject ID`,"-v4"), paste0(juice$`Subject ID`,"-v2")))
+  
+```
+
+save CSV
+```{r}
+write_csv(juice, file.path(paths$box, "potential_mimic_subjects.csv"))
+```
+

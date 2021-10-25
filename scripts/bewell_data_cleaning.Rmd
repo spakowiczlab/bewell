@@ -1,9 +1,7 @@
 ---
 title: "bewell data cleaning"
 author: "Caroline Wheeler"
-date: "8/18/2021"
-output: html_document
----
+date: "8/18/2021"0
 
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
