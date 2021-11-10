@@ -1,0 +1,53 @@
+---
+title: "make data tables"
+author: "Caroline Wheeler"
+date: "11/9/2021"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+
+library(tidyverse)
+```
+
+
+read in data and merge metaphlan results to create merged taxonomy file
+```{r}
+barcodes <- read.csv("/fs/ess/PAS1695/projects/bewell/data/bewell_barcodes.csv")
+
+fq.df <- as.data.frame(list.files("/fs/ess/PAS1695/projects/bewell/data/fastqs/profiled")) 
+
+fq.df <- fq.df %>%
+  mutate(sampnames = substr(fq.df$`list.files("/fs/ess/PAS1695/projects/bewell/data/fastqs/profiled")`, 10, 19))
+
+mettab.ls <- lapply(fq.df$sampnames, function(x) read.table(paste0("/fs/ess/PAS1695/projects/bewell/data/fastqs/profiled/profiled_", x, ".txt"),
+                                                            header = F, sep = "\t", stringsAsFactors = F))
+names(mettab.ls) <- fq.df$sampnames
+
+metab.df <- bind_rows(lapply(fq.df$sampnames, function(x) mettab.ls[[x]] %>% mutate(sample = x)))
+
+metab.df.form <- metab.df %>%
+  dplyr::rename("Taxonomy" = "V1",
+         "TaxNum" = "V2",
+         "RelAbun" = "V3",
+         "Alternative.Tax" = "V4")
+
+df <- merge(barcodes, metab.df.form)
+df$id <- as.character(df$id)
+```
+
+add timepoint value
+```{r}
+subs <- read_csv("/fs/ess/PAS1695/projects/bewell/data/mimic_subjects.csv")
+
+keep <- melt(subs, id.vars=1:3) %>%
+  dplyr::rename("id" = value)
+
+df <- merge(keep, df)
+```
+
+save table
+```{r}
+write.csv(df,"/fs/ess/PAS1695/projects/bewell/data/bewell_taxonomy_relAbun.csv", row.names = FALSE)
+```
