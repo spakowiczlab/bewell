@@ -22,7 +22,7 @@ source("00-paths.R")
 ```{r}
 y <- readxl::read_xlsx(file.path(paths$box, 
                                  "participants", 
-                                 "Be Well Study Schedule.xlsx"),
+                                 "bewell_studyschedule-v1.xlsx"),
                        trim_ws = TRUE,
                        sheet = 2)
 
@@ -34,7 +34,7 @@ Get the first sheet to retrieve the dropout date
 ```{r}
 x <- readxl::read_xlsx(file.path(paths$box, 
                                  "participants", 
-                                 "Be Well Study Schedule.xlsx"),
+                                 "bewell_studyschedule-v1.xlsx"),
                        trim_ws = TRUE,
                        skip = 1,
                        sheet = 1) %>%

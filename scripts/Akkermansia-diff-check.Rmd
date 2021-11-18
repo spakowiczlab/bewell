@@ -1,0 +1,37 @@
+---
+title: "Akkermansia diff check"
+author: "Dan Spakowicz"
+date: "11/10/2021"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+
+library(tidyverse)
+```
+
+```{r cars}
+x <- read_csv("../data/derived/bewell_akkermansia.csv")
+```
+```{r}
+y <- 
+  x %>%
+  mutate(BRB = tB - rB,
+         Plac = tP - rP) %>%
+  select(BRB, Plac) %>%
+  gather("treatment", "rel.abun")
+```
+
+
+```{r}
+y %>%
+  ggplot(aes(x = rel.abun)) +
+  geom_density(aes(fill = treatment), alpha = 0.3) +
+  theme_bw() +
+  labs(x = "Change in Akkermansia Relative Abundance",
+       y = "Density")
+ggsave("../figures/Akk-diff-check.png",
+       height = 3, width = 5)
+```
+
