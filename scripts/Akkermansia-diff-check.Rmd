@@ -19,8 +19,13 @@ y <-
   x %>%
   mutate(BRB = tB - rB,
          Plac = tP - rP) %>%
-  select(BRB, Plac) %>%
-  gather("treatment", "rel.abun")
+  select(Subject.ID, BRB, Plac) %>%
+  gather(-Subject.ID, 
+         key = "treatment", 
+         value = "rel.abun") %>%
+  mutate(trt.bin = if_else(treatment == "BRB",
+                           true = 1,
+                           false = 0))
 ```
 
 
@@ -34,4 +39,27 @@ y %>%
 ggsave("../figures/Akk-diff-check.png",
        height = 3, width = 5)
 ```
+
+```{r}
+var.test(rel.abun ~ treatment, data = y)
+
+t.test(rel.abun ~ treatment, data = y)
+
+wilcox.test(rel.abun ~ treatment, data = y)
+
+logit <- 
+  glm(trt.bin ~ rel.abun, 
+    family = "binomial",
+    data = y)
+
+summary(logit)
+```
+
+```{r}
+y %>%
+  arrange(-rel.abun) %>%
+  filter(treatment == "BRB")
+
+```
+
 
