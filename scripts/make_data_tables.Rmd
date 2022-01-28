@@ -17,16 +17,17 @@ read in data and merge metaphlan results to create merged taxonomy file
 ```{r}
 barcodes <- read.csv("/fs/ess/PAS1695/projects/bewell/data/bewell_barcodes.csv")
 
-fq.df <- as.data.frame(list.files("/fs/ess/PAS1695/projects/bewell/data/fastqs/profiled")) 
+fq.df <- as.data.frame(list.files("/fs/ess/PAS1695/projects/bewell/data/profiled")) 
 
 fq.df <- fq.df %>%
-  mutate(sampnames = substr(fq.df$`list.files("/fs/ess/PAS1695/projects/bewell/data/fastqs/profiled")`, 10, 19))
+  mutate(sampnames = substr(fq.df$`list.files("/fs/ess/PAS1695/projects/bewell/data/profiled")`, 10, 19))
 
-mettab.ls <- lapply(fq.df$sampnames, function(x) read.table(paste0("/fs/ess/PAS1695/projects/bewell/data/fastqs/profiled/profiled_", x, ".txt"),
+mettab.ls <- lapply(fq.df$sampnames, function(x) read.table(paste0("/fs/ess/PAS1695/projects/bewell/data/profiled/profiled_", x, ".txt"),
                                                             header = F, sep = "\t", stringsAsFactors = F))
 names(mettab.ls) <- fq.df$sampnames
 
-metab.df <- bind_rows(lapply(fq.df$sampnames, function(x) mettab.ls[[x]] %>% mutate(sample = x)))
+mettab.ls <- mettab.ls[-63]
+metab.df <- bind_rows(lapply(fq.df$sampnames, function(x) mettab.ls[[x]]))
 
 metab.df.form <- metab.df %>%
   dplyr::rename("Taxonomy" = "V1",
