@@ -39,12 +39,7 @@ akk <-
 
 save table
 ```{r}
-<<<<<<< HEAD
 write.csv(akk,"/fs/ess/PAS1695/projects/bewell/data/bewell_akkermansia.csv", row.names = FALSE)
-=======
-write.csv(akk,
-          "../data/derived/bewell_akkermansia.csv", row.names = FALSE)
->>>>>>> 389e19284bfbe2a48f6c81754d09607af3c3d903
 ```
 
 
