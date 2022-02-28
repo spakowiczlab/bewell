@@ -1,0 +1,23 @@
+---
+title: "cytokines"
+author: "Rebecca Hoyd"
+date: "2/25/2022"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+
+library(tidyverse)
+source("00-paths.R")
+```
+
+# Load data
+
+```{r}
+
+```
+
+# Find outliers
+
+
