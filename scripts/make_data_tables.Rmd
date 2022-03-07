@@ -12,8 +12,7 @@ library(tidyverse)
 library(reshape2)
 ```
 
-
-read in data and merge metaphlan results to create merged taxonomy file
+read in metaphlan tables and merge
 ```{r}
 barcodes <- read.csv("/fs/ess/PAS1695/projects/bewell/data/bewell_barcodes.csv")
 
@@ -42,16 +41,13 @@ metab.df.form <- metab.df %>%
          "RelAbun" = "V3",
          "Alternative.Tax" = "V4")
 
-
-
-
 df <- merge(barcodes, metab.df.form)
 df$id <- as.character(df$id)
 ```
 
 add timepoint value
 ```{r}
-subs <- read_csv("/fs/ess/PAS1695/projects/bewell/data/mimic_subjects.csv")
+subs <- read_csv("/fs/ess/PAS1695/projects/bewell/data/potential_mimic_subjects.csv")
 
 keep <- melt(subs, id.vars=1:3) %>%
   dplyr::rename("id" = value)
@@ -63,3 +59,64 @@ save table
 ```{r}
 write.csv(df,"/fs/ess/PAS1695/projects/bewell/data/bewell_taxonomy_relAbun.csv", row.names = FALSE)
 ```
+
+## Create long form tables for each taxonomic level
+
+Seperate taxonomic levels
+```{r}
+df <- df %>%
+  select(Subject.Number, variable, Taxonomy, RelAbun)
+
+taxa <- df %>% 
+  separate(Taxonomy, c("Kingdom", "Phylum", "Class", "Order", "Family", "Genus", "Species"), "\\|")
+
+get_level <- function(lev, next_lev){
+  temp <- taxa %>%
+    filter(is.na(taxa[,next_lev])) %>%
+    select(Subject.Number, variable, lev, RelAbun)
+
+  return(temp)
+}
+
+taxa_king <- get_level("Kingdom", "Phylum")
+taxa_phyl <- get_level("Phylum", "Class") %>% filter(!(is.na(Phylum)))
+taxa_class <- get_level("Class", "Order") %>% filter(!(is.na(Class)))
+taxa_ord <- get_level("Order", "Family") %>% filter(!(is.na(Order)))
+taxa_fam <- get_level("Family", "Genus") %>% filter(!(is.na(Family)))
+taxa_gen <- get_level("Genus", "Species") %>% filter(!(is.na(Genus)))
+  
+taxa_spec <- taxa %>%
+  select(Subject.Number, variable, Species, RelAbun) %>%
+  filter(!(is.na(Species)))
+```
+
+
+change to wide form
+```{r}
+go_wide <- function(df, level){
+  d <- spread(df, key = level, value = RelAbun) 
+  d[is.na(d)] <- 0
+  return(d)
+}
+
+df_king <- go_wide(taxa_king, "Kingdom")
+df_phyl <- go_wide(taxa_phyl, "Phylum")
+df_class <- go_wide(taxa_class, "Class")
+df_ord <- go_wide(taxa_ord, "Order")
+df_fam <- go_wide(taxa_fam, "Family")
+df_gen <- go_wide(taxa_gen, "Genus")
+df_spec <- go_wide(taxa_spec, "Species")
+```
+
+
+Save data tables
+```{r}
+write.csv(df_king,"/fs/ess/PAS1695/projects/bewell/data/RelAbun_king.csv", row.names = FALSE)
+write.csv(df_phyl,"/fs/ess/PAS1695/projects/bewell/data/RelAbun_phyl.csv", row.names = FALSE)
+write.csv(df_class,"/fs/ess/PAS1695/projects/bewell/data/RelAbun_class.csv", row.names = FALSE)
+write.csv(df_ord,"/fs/ess/PAS1695/projects/bewell/data/RelAbun_ord.csv", row.names = FALSE)
+write.csv(df_fam,"/fs/ess/PAS1695/projects/bewell/data/RelAbun_fam.csv", row.names = FALSE)
+write.csv(df_gen,"/fs/ess/PAS1695/projects/bewell/data/RelAbun_gen.csv", row.names = FALSE)
+write.csv(df_spec,"/fs/ess/PAS1695/projects/bewell/data/RelAbun_spec.csv", row.names = FALSE)
+```
+
