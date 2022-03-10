@@ -143,4 +143,3 @@ ggsave(plot = gB, file = "/users/PAS1695/whee57/Github/bewell/figures/BRB_stacke
 ggsave(plot = gP, file = "/users/PAS1695/whee57/Github/bewell/figures/Placebo_stacked_bar.png", dev = "png", width = 13, height = 13)
 ggsave(plot = g, file = "/users/PAS1695/whee57/Github/bewell/figures/BRB-Placebo_stacked_bar.png", dev = "png", width = 26, height = 13)
 ```
-

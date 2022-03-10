@@ -65,7 +65,8 @@ write.csv(df,"/fs/ess/PAS1695/projects/bewell/data/bewell_taxonomy_relAbun.csv",
 Seperate taxonomic levels
 ```{r}
 df <- df %>%
-  select(Subject.Number, variable, Taxonomy, RelAbun)
+  mutate(sampleID = paste0(Subject.Number, "-", variable)) %>%
+  select(sampleID, Taxonomy, RelAbun)
 
 taxa <- df %>% 
   separate(Taxonomy, c("Kingdom", "Phylum", "Class", "Order", "Family", "Genus", "Species"), "\\|")
@@ -73,7 +74,7 @@ taxa <- df %>%
 get_level <- function(lev, next_lev){
   temp <- taxa %>%
     filter(is.na(taxa[,next_lev])) %>%
-    select(Subject.Number, variable, lev, RelAbun)
+    select(sampleID, lev, RelAbun)
 
   return(temp)
 }
@@ -86,7 +87,7 @@ taxa_fam <- get_level("Family", "Genus") %>% filter(!(is.na(Family)))
 taxa_gen <- get_level("Genus", "Species") %>% filter(!(is.na(Genus)))
   
 taxa_spec <- taxa %>%
-  select(Subject.Number, variable, Species, RelAbun) %>%
+  select(sampleID, Species, RelAbun) %>%
   filter(!(is.na(Species)))
 ```
 
@@ -96,7 +97,9 @@ change to wide form
 go_wide <- function(df, level){
   d <- spread(df, key = level, value = RelAbun) 
   d[is.na(d)] <- 0
-  return(d)
+  d2 <- d[,-1]
+  rownames(d2) <- d[,1]
+  return(d2)
 }
 
 df_king <- go_wide(taxa_king, "Kingdom")
@@ -109,14 +112,15 @@ df_spec <- go_wide(taxa_spec, "Species")
 ```
 
 
+
 Save data tables
 ```{r}
-write.csv(df_king,"/fs/ess/PAS1695/projects/bewell/data/RelAbun_king.csv", row.names = FALSE)
-write.csv(df_phyl,"/fs/ess/PAS1695/projects/bewell/data/RelAbun_phyl.csv", row.names = FALSE)
-write.csv(df_class,"/fs/ess/PAS1695/projects/bewell/data/RelAbun_class.csv", row.names = FALSE)
-write.csv(df_ord,"/fs/ess/PAS1695/projects/bewell/data/RelAbun_ord.csv", row.names = FALSE)
-write.csv(df_fam,"/fs/ess/PAS1695/projects/bewell/data/RelAbun_fam.csv", row.names = FALSE)
-write.csv(df_gen,"/fs/ess/PAS1695/projects/bewell/data/RelAbun_gen.csv", row.names = FALSE)
-write.csv(df_spec,"/fs/ess/PAS1695/projects/bewell/data/RelAbun_spec.csv", row.names = FALSE)
+write.csv(df_king,"/fs/ess/PAS1695/projects/bewell/data/RelAbun_king.csv")
+write.csv(df_phyl,"/fs/ess/PAS1695/projects/bewell/data/RelAbun_phyl.csv")
+write.csv(df_class,"/fs/ess/PAS1695/projects/bewell/data/RelAbun_class.csv")
+write.csv(df_ord,"/fs/ess/PAS1695/projects/bewell/data/RelAbun_ord.csv")
+write.csv(df_fam,"/fs/ess/PAS1695/projects/bewell/data/RelAbun_fam.csv")
+write.csv(df_gen,"/fs/ess/PAS1695/projects/bewell/data/RelAbun_gen.csv")
+write.csv(df_spec,"/fs/ess/PAS1695/projects/bewell/data/RelAbun_spec.csv")
 ```
 
