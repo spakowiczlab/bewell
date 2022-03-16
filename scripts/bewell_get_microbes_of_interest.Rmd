@@ -9,9 +9,6 @@ output: html_document
 knitr::opts_chunk$set(echo = TRUE)
 
 library(tidyverse)
-library(vegan)
-library(reshape2)
-library(ecolTest)
 ```
 
 read in data w/o row names
@@ -48,6 +45,23 @@ run_wilcox <- function(level, str1, str2){
 }
 ```
 
+function to get direction of change
+```{r}
+get_direction <- function(df, mic){
+  temp <- allMics %>%
+  group_by(time) %>%
+  summarize(mean(eval(as.name(mic))))
+  
+  dif <- as.double(temp[3,2] - temp[1,2])
+  if(dif > 0){
+    df[mic, "direction"] <- "increase"
+  }else{
+    df[mic, "direction"] <- "decrease"
+  }
+  return(df)
+}
+```
+
 BRB all levels
 ```{r warning=FALSE}
 spec_dif <- run_wilcox(spec, "rB", "tB")
@@ -80,249 +94,14 @@ add direction to BRB results table
 ```{r}
 BRBresults$direction <- NA
 
-sigMics <- rownames(BRBresults)
-
 allMics <- cbind(king, phyl, class, ord, fam, gen, spec)
   
 allMics <- allMics %>%
   mutate(time = rownames(allMics)) %>%
   mutate(time = substr(time, nchar(time)-1, nchar(time)))
 
-# p__Firmicutes
-temp <- allMics %>%
-  group_by(time) %>%
-  summarize(mean(p__Firmicutes))
-
-dif <- as.double(temp[3,2] - temp[1,2])
-if(dif > 0){
-  BRBresults["p__Firmicutes", "direction"] <- "increase"
-}else{
-  BRBresults["p__Firmicutes", "direction"] <- "decrease"
-}
-
-# c__Clostridia 
-temp <- allMics %>%
-  group_by(time) %>%
-  summarize(mean(c__Clostridia))
-
-dif <- as.double(temp[3,2] - temp[1,2])
-if(dif > 0){
-  BRBresults["c__Clostridia", "direction"] <- "increase"
-}else{
-  BRBresults["c__Clostridia", "direction"] <- "decrease"
-}
-
-# o__Clostridiales
-temp <- allMics %>%
-  group_by(time) %>%
-  summarize(mean(o__Clostridiales))
-
-dif <- as.double(temp[3,2] - temp[1,2])
-if(dif > 0){
-  BRBresults["o__Clostridiales", "direction"] <- "increase"
-}else{
-  BRBresults["o__Clostridiales", "direction"] <- "decrease"
-}
-
-# f__Eubacteriaceae
-temp <- allMics %>%
-  group_by(time) %>%
-  summarize(mean(f__Eubacteriaceae))
-
-dif <- as.double(temp[3,2] - temp[1,2])
-if(dif > 0){
-  BRBresults["f__Eubacteriaceae", "direction"] <- "increase"
-}else{
-  BRBresults["f__Eubacteriaceae", "direction"] <- "decrease"
-}
-
-# f__Lachnospiraceae
-temp <- allMics %>%
-  group_by(time) %>%
-  summarize(mean(f__Lachnospiraceae))
-
-dif <- as.double(temp[3,2] - temp[1,2])
-if(dif > 0){
-  BRBresults["f__Lachnospiraceae", "direction"] <- "increase"
-}else{
-  BRBresults["f__Lachnospiraceae", "direction"] <- "decrease"
-}
-# f__Tannerellaceae
-temp <- allMics %>%
-  group_by(time) %>%
-  summarize(mean(f__Lachnospiraceae))
-
-dif <- as.double(temp[3,2] - temp[1,2])
-if(dif > 0){
-  BRBresults["f__Tannerellaceae", "direction"] <- "increase"
-}else{
-  BRBresults["f__Tannerellaceae", "direction"] <- "decrease"
-}
-
-# g__Dialister
-temp <- allMics %>%
-  group_by(time) %>%
-  summarize(mean(g__Dialister))
-
-dif <- as.double(temp[3,2] - temp[1,2])
-if(dif > 0){
-  BRBresults["g__Dialister", "direction"] <- "increase"
-}else{
-  BRBresults["g__Dialister", "direction"] <- "decrease"
-}
-# g__Eubacterium
-temp <- allMics %>%
-  group_by(time) %>%
-  summarize(mean(g__Eubacterium))
-
-dif <- as.double(temp[3,2] - temp[1,2])
-if(dif > 0){
-  BRBresults["g__Eubacterium", "direction"] <- "increase"
-}else{
-  BRBresults["g__Eubacterium", "direction"] <- "decrease"
-}
-# g__Lachnospira
-temp <- allMics %>%
-  group_by(time) %>%
-  summarize(mean(g__Lachnospira))
-
-dif <- as.double(temp[3,2] - temp[1,2])
-if(dif > 0){
-  BRBresults["g__Lachnospira", "direction"] <- "increase"
-}else{
-  BRBresults["g__Lachnospira", "direction"] <- "decrease"
-}
-# g__Lachnospiraceae_unclassified
-temp <- allMics %>%
-  group_by(time) %>%
-  summarize(mean(g__Lachnospiraceae_unclassified))
-
-dif <- as.double(temp[3,2] - temp[1,2])
-if(dif > 0){
-  BRBresults["g__Lachnospiraceae_unclassified", "direction"] <- "increase"
-}else{
-  BRBresults["g__Lachnospiraceae_unclassified", "direction"] <- "decrease"
-}
-# g__Parabacteroides
-temp <- allMics %>%
-  group_by(time) %>%
-  summarize(mean(g__Parabacteroides))
-
-dif <- as.double(temp[3,2] - temp[1,2])
-if(dif > 0){
-  BRBresults["g__Parabacteroides", "direction"] <- "increase"
-}else{
-  BRBresults["g__Parabacteroides", "direction"] <- "decrease"
-}
-# s__Bacteroides_massiliensis
-temp <- allMics %>%
-  group_by(time) %>%
-  summarize(mean(s__Bacteroides_massiliensis))
-
-dif <- as.double(temp[3,2] - temp[1,2])
-if(dif > 0){
-  BRBresults["s__Bacteroides_massiliensis", "direction"] <- "increase"
-}else{
-  BRBresults["s__Bacteroides_massiliensis", "direction"] <- "decrease"
-}
-# s__Blautia_obeum
-temp <- allMics %>%
-  group_by(time) %>%
-  summarize(mean(s__Blautia_obeum))
-
-dif <- as.double(temp[3,2] - temp[1,2])
-if(dif > 0){
-  BRBresults["s__Blautia_obeum", "direction"] <- "increase"
-}else{
-  BRBresults["s__Blautia_obeum", "direction"] <- "decrease"
-}
-# s__Dialister_invisus
-temp <- allMics %>%
-  group_by(time) %>%
-  summarize(mean(s__Dialister_invisus))
-
-dif <- as.double(temp[3,2] - temp[1,2])
-if(dif > 0){
-  BRBresults["s__Dialister_invisus", "direction"] <- "increase"
-}else{
-  BRBresults["s__Dialister_invisus", "direction"] <- "decrease"
-}
-# s__Eubacterium_eligens
-temp <- allMics %>%
-  group_by(time) %>%
-  summarize(mean(s__Eubacterium_eligens))
-
-dif <- as.double(temp[3,2] - temp[1,2])
-if(dif > 0){
-  BRBresults["s__Eubacterium_eligens", "direction"] <- "increase"
-}else{
-  BRBresults["s__Eubacterium_eligens", "direction"] <- "decrease"
-}
-# s__Eubacterium_ramulus
-temp <- allMics %>%
-  group_by(time) %>%
-  summarize(mean(s__Eubacterium_ramulus))
-
-dif <- as.double(temp[3,2] - temp[1,2])
-if(dif > 0){
-  BRBresults["s__Eubacterium_ramulus", "direction"] <- "increase"
-}else{
-  BRBresults["s__Eubacterium_ramulus", "direction"] <- "decrease"
-}
-# s__Eubacterium_rectale
-temp <- allMics %>%
-  group_by(time) %>%
-  summarize(mean(s__Eubacterium_rectale))
-
-dif <- as.double(temp[3,2] - temp[1,2])
-if(dif > 0){
-  BRBresults["s__Eubacterium_rectale", "direction"] <- "increase"
-}else{
-  BRBresults["s__Eubacterium_rectale", "direction"] <- "decrease"
-}
-# s__Lachnospira_pectinoschiza
-temp <- allMics %>%
-  group_by(time) %>%
-  summarize(mean(s__Lachnospira_pectinoschiza))
-
-dif <- as.double(temp[3,2] - temp[1,2])
-if(dif > 0){
-  BRBresults["s__Lachnospira_pectinoschiza", "direction"] <- "increase"
-}else{
-  BRBresults["s__Lachnospira_pectinoschiza", "direction"] <- "decrease"
-}
-# s__Oscillibacter_sp_57_20
-temp <- allMics %>%
-  group_by(time) %>%
-  summarize(mean(s__Oscillibacter_sp_57_20))
-
-dif <- as.double(temp[3,2] - temp[1,2])
-if(dif > 0){
-  BRBresults["s__Oscillibacter_sp_57_20", "direction"] <- "increase"
-}else{
-  BRBresults["s__Oscillibacter_sp_57_20", "direction"] <- "decrease"
-}
-# s__Ruminococcus_bicirculans
-temp <- allMics %>%
-  group_by(time) %>%
-  summarize(mean(s__Ruminococcus_bicirculans))
-
-dif <- as.double(temp[3,2] - temp[1,2])
-if(dif > 0){
-  BRBresults["s__Ruminococcus_bicirculans", "direction"] <- "increase"
-}else{
-  BRBresults["s__Ruminococcus_bicirculans", "direction"] <- "decrease"
-}
-# s__Ruminococcus_lactaris
-temp <- allMics %>%
-  group_by(time) %>%
-  summarize(mean(s__Ruminococcus_lactaris))
-
-dif <- as.double(temp[3,2] - temp[1,2])
-if(dif > 0){
-  BRBresults["s__Ruminococcus_lactaris", "direction"] <- "increase"
-}else{
-  BRBresults["s__Ruminococcus_lactaris", "direction"] <- "decrease"
+for (microbe in rownames(BRBresults)) {
+  BRBresults <- get_direction(BRBresults, microbe)
 }
 ```
 
@@ -333,94 +112,8 @@ write.csv(BRBresults, "../data/derived/BRBmicrobiomeResults.csv")
 
 add direction to Placebo results table
 ```{r}
-# o__Enterobacterales
-temp <- allMics %>%
-  group_by(time) %>%
-  summarize(mean(o__Enterobacterales))
-
-dif <- as.double(temp[4,2] - temp[2,2])
-if(dif > 0){
-  resultsPlacebo["o__Enterobacterales", "direction"] <- "increase"
-}else{
-  resultsPlacebo["o__Enterobacterales", "direction"] <- "decrease"
-}
-# g__Monoglobus
-temp <- allMics %>%
-  group_by(time) %>%
-  summarize(mean(g__Monoglobus))
-
-dif <- as.double(temp[4,2] - temp[2,2])
-if(dif > 0){
-  resultsPlacebo["g__Monoglobus", "direction"] <- "increase"
-}else{
-  resultsPlacebo["g__Monoglobus", "direction"] <- "decrease"
-}
-# g__Ruthenibacterium
-temp <- allMics %>%
-  group_by(time) %>%
-  summarize(mean(g__Ruthenibacterium))
-
-dif <- as.double(temp[4,2] - temp[2,2])
-if(dif > 0){
-  resultsPlacebo["g__Ruthenibacterium", "direction"] <- "increase"
-}else{
-  resultsPlacebo["g__Ruthenibacterium", "direction"] <- "decrease"
-}
-# s__Firmicutes_bacterium_CAG_94
-temp <- allMics %>%
-  group_by(time) %>%
-  summarize(mean(s__Firmicutes_bacterium_CAG_94))
-
-dif <- as.double(temp[4,2] - temp[2,2])
-if(dif > 0){
-  resultsPlacebo["s__Firmicutes_bacterium_CAG_94", "direction"] <- "increase"
-}else{
-  resultsPlacebo["s__Firmicutes_bacterium_CAG_94", "direction"] <- "decrease"
-}
-# s__Monoglobus_pectinilyticus
-temp <- allMics %>%
-  group_by(time) %>%
-  summarize(mean(s__Monoglobus_pectinilyticus))
-
-dif <- as.double(temp[4,2] - temp[2,2])
-if(dif > 0){
-  resultsPlacebo["s__Monoglobus_pectinilyticus", "direction"] <- "increase"
-}else{
-  resultsPlacebo["s__Monoglobus_pectinilyticus", "direction"] <- "decrease"
-}
-# s__Oscillibacter_sp_57_20
-temp <- allMics %>%
-  group_by(time) %>%
-  summarize(mean(s__Oscillibacter_sp_57_20))
-
-dif <- as.double(temp[4,2] - temp[2,2])
-if(dif > 0){
-  resultsPlacebo["s__Oscillibacter_sp_57_20", "direction"] <- "increase"
-}else{
-  resultsPlacebo["s__Oscillibacter_sp_57_20", "direction"] <- "decrease"
-}
-
-# s__Ruthenibacterium_lactatiformans
-temp <- allMics %>%
-  group_by(time) %>%
-  summarize(mean(s__Ruthenibacterium_lactatiformans))
-
-dif <- as.double(temp[4,2] - temp[2,2])
-if(dif > 0){
-  resultsPlacebo["s__Ruthenibacterium_lactatiformans", "direction"] <- "increase"
-}else{
-  resultsPlacebo["s__Ruthenibacterium_lactatiformans", "direction"] <- "decrease"
-}
-# s__Streptococcus_salivarius
-temp <- allMics %>%
-  group_by(time) %>%
-  summarize(mean(s__Streptococcus_salivarius))
-
-dif <- as.double(temp[4,2] - temp[2,2])
-if(dif > 0){
-  resultsPlacebo["s__Streptococcus_salivarius", "direction"] <- "increase"
-}else{
-  resultsPlacebo["s__Streptococcus_salivarius", "direction"] <- "decrease"
+for (microbe in rownames(resultsPlacebo)) {
+  resultsPlacebo <- get_direction(resultsPlacebo, microbe)
 }
 ```
 
@@ -429,174 +122,25 @@ save Placresults
 write.csv(resultsPlacebo, "../data/derived/PlaceboMicrobiomeResults.csv")
 ```
 
-Top 5
+<!-- Top 5 -->
+<!-- ```{r} -->
+<!-- sigMics <- rownames(results %>% arrange(p_wilcox) %>% slice(1:6)) -->
+<!-- ``` -->
+
+boxplots of significant microbes
 ```{r}
-sigMics <- rownames(results %>% arrange(p_wilcox) %>% slice(1:6))
-```
-
-
-
-
-
-
-
-
-
-
-
-rename NA
-```{r}
-taxa <- taxa %>%
-  mutate(Genus = ifelse(is.na(Genus), paste0("g__unclassified"), Genus),
-          Family = ifelse(is.na(Family), paste0("f__unclassified-", gsub("g__unclassified-", "", Genus)), Family),
-          Order = ifelse(is.na(Order), paste0("o__unclassified-", gsub("f__unclassified-", "", Family)), Order),
-          Class = ifelse(is.na(Class), paste0("c__unclassified-", gsub("o__unclassified-", "", Order)), Class),
-          Phylum = ifelse(is.na(Phylum), paste0("p__unclassified-", gsub("c__unclassified-", "", Class)),Phylum),
-         )
-```
-
-prep data fro diversity calculation
-```{r}
-div <- taxa %>%
-  select(id, Genus, RelAbun)
-
-div <- dcast(div, id~Genus)
-```
-
-calculate alpha diversity using simpsons index
-```{r}
-div$alpha <- diversity(div %>% select(-id), index = "simpson")
-```
-
-prep for t-test
-```{r}
-div_results <- div %>%
-  select(id, alpha) 
-
-BRB <- taxa %>%
-  select(id, Subject.ID, variable)
-
-div_results <- merge(BRB, div_results) %>% unique() %>%
-  select(Subject.ID, variable, alpha)
-
-div_results_BRB <- div_results %>%
-  filter(variable == "rB" | variable == "tB") 
-
-div_results_plac <- div_results %>%
-  filter(variable == "rP" | variable == "tP") 
-```
-
-
-
-compare avg pre/post BRB
-```{r}
-# avgBRB <- div_results_BRB %>%
-#   group_by(variable) %>%
-#   summarise(mean(alpha))
-# 
-# avgPlac <- div_results_plac %>%
-#   group_by(variable) %>%
-#   summarise(mean(alpha))
-
-rB <-  div_results %>%
-  filter(variable == "rB")
-rB <- rB$alpha
-tB <- div_results %>%
-  filter(variable == "tB")
-tB <- tB$alpha
-rP <- div_results %>%
-  filter(variable == "rP")
-rP <- rP$alpha
-tP <- div_results %>%
-  filter(variable == "tP")
-tP <- tP$alpha
-
-
-Hutcheson_t_test(
-  rB,
-  tB,
-  shannon.base = exp(1),
-  alternative = "two.sided",
-  difference = 0
-)
-
-Hutcheson_t_test(
-  rP,
-  tP,
-  shannon.base = exp(1),
-  alternative = "two.sided",
-  difference = 0
-)
-```
-
-```{r}
-t.test(rB, tB)
-t.test(rP, tP)
-```
-
-
-```{r}
-check <- taxa %>%
-  select(Subject.Number, variable, Genus, RelAbun) %>%
-  filter(Genus != "g__unclassified") %>% distinct()
-
-checkRB <- check %>% filter(variable == "rB")
-checkTB <- check %>% filter(variable == "tB")
-
-checkRP <- check %>% filter(variable == "rP")
-checkTP <- check %>% filter(variable == "tP")
-
-
-checkBRB <- check %>%
-  filter(variable == "rB" | variable == "tB")
-
-checkPlac <- check %>%
-  filter(variable == "rP" | variable == "tP")
-```
-
-```{r}
-BRBmics <- checkBRB %>% select(Genus) %>% distinct()
-Placmics <- checkPlac %>% select(Genus) %>% distinct()
-
-BRBmics <- BRBmics$Genus
-Placmics <- Placmics$Genus
-```
-
-BRB
-```{r}
-for (mic in BRBmics) {
-  temp <- checkBRB %>%
-    filter(Genus == mic)
-  tempR <- temp %>% filter(variable == "rB")
-  tempT <- temp %>% filter(variable == "tB")
+sigMics <- allMics[, which((colnames(allMics) %in% rownames(BRBresults))==TRUE)]
+sigMics <- sigMics %>%
+  mutate(time = rownames(sigMics)) %>%
+  mutate(time = substr(time, nchar(time)-1, nchar(time))) %>%
+  filter(time == "rB" | time == "tB") %>%
+  select(-s__Oscillibacter_sp_57_20)
   
-  if((nrow(tempR) > 1) & (nrow(tempT) > 1)){
-    print(mic)
-    print(t.test(tempR$RelAbun, tempT$RelAbun))
-  }
-}
+sigMics <- melt(sigMics)
+
+bp <- ggplot(sigMics, aes(x=time, y=value)) + geom_boxplot(aes(fill=time)) + xlab("") + ylab("Relative Abundance") + labs(fill = "") + theme_bw(base_size = 25) + theme(axis.text.x = element_text(angle = 45, hjust=1)) + scale_fill_manual(values=c("red3", "cornflowerblue")) + facet_wrap(. ~ variable, scales = "free")
+  
+bp
+
+ggsave(filename = "../figures/microbiomeBP.png", plot = bp, width = 25, height = 25, dpi = 300)
 ```
-```{r}
-checkBRB %>%
-  filter(Genus == "g__Erysipelatoclostridium") %>%
-  group_by(variable) %>%
-  summarize(mean(RelAbun))
-  
-checkBRB %>%
-  filter(Genus == "g__Lachnospiraceae_unclassified") %>%
-  group_by(variable) %>%
-  summarize(mean(RelAbun))
-  
-checkBRB %>%
-  filter(Genus == "g__Lachnospira") %>%
-  group_by(variable) %>%
-  summarize(mean(RelAbun))
-  
-checkBRB %>%
-  filter(Genus == "g__Bifidobacterium") %>%
-  group_by(variable) %>%
-  summarize(mean(RelAbun))
-```
-
-
-
