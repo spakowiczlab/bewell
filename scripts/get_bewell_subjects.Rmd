@@ -16,7 +16,7 @@ source("00-paths.R")
 
 read in and transform randomization data
 ```{r}
-juice <- read.csv(file.path(paths$box, "P426HONC60BeWell_DATA_LABELS_2021-10-20_1538.csv")) %>%
+juice <- read.csv(file.path(paths$box, "participants/P426HONC60BeWell_DATA_LABELS_2021-10-20_1538.csv")) %>%
   select(Subject.Number, Randomized.to.receive.683.at) %>%
   na_if("") %>%
   drop_na() %>%
@@ -25,7 +25,7 @@ juice <- read.csv(file.path(paths$box, "P426HONC60BeWell_DATA_LABELS_2021-10-20_
 
 read in and transform subject data for stool sample completeness
 ```{r}
-subs <- read_excel(file.path(paths$box, "bewell_studyschedule-v1.xlsx"), sheet = 4) %>%
+subs <- read_excel(file.path(paths$box, "participants/bewell_studyschedule-v1.xlsx"), sheet = 4) %>%
   select(c(1:17)) %>%
   na_if("m")
 
@@ -36,12 +36,12 @@ merge
 juice <- merge(juice, subs)
 ```
 
-remove samples missing more than 1 stool tub
-```{r}
-cnt_na <- apply(juice, 1, function(z) sum(is.na(z)))
+<!-- remove samples missing more than 1 stool tub -->
+<!-- ```{r} -->
+<!-- cnt_na <- apply(juice, 1, function(z) sum(is.na(z))) -->
 
-juice <- juice[cnt_na < 2,]
-```
+<!-- juice <- juice[cnt_na < 2,] -->
+<!-- ``` -->
 
 ```{r}
 juice <- juice %>%
@@ -53,6 +53,32 @@ juice <- juice %>%
   
 ```
 
+read in barcodes
+```{r}
+extra <- readxl::read_xlsx(file.path(paths$box, "data/onecodex/2021_09-14_bewell_OneCodex_Sample-Registration.xlsx")) %>%
+  select(`Barcode ID`, Name)
+barcodes <- readxl::read_xlsx(file.path(paths$box, "data/onecodex/One Codex Sample Registration-v2.xlsx")) %>%
+  select(`Barcode ID`, Name)
+
+barcodes <- rbind(extra, barcodes)
+bars <- barcodes$Name
+```
+
+replace sample names with .1 version and NA where necessary
+HONC60-07-v3.1, HONC60-05-v3.1, HONC60-21-v1.1
+```{r}
+juice <- juice %>%
+  mutate(rB = ifelse(rB %in% bars, rB, NA),
+         tB = ifelse(tB %in% bars, tB, NA),
+         rP = ifelse(rP %in% bars, rP, NA),
+         tP = ifelse(tP %in% bars, tP, NA))
+
+juice[3, 6] <- "HONC60-05-v3.1"
+juice[4, 6] <- "HONC60-07-v3.1"
+juice[7, 4] <- "HONC60-21-v1.1"
+#juice[1, 4] <- "HONC60-21-v1.1"
+```
+
 save CSV
 ```{r}
 write_csv(juice, file.path(paths$box, "potential_mimic_subjects.csv"))
@@ -60,6 +86,6 @@ write_csv(juice, file.path(paths$box, "potential_mimic_subjects.csv"))
 
 save CSV with all subjects
 ```{r}
-write_csv(juice, file.path(paths$box, "mimic_subjects.csv"))
+write_csv(juice, file.path(paths$box, "bewell_subjects.csv"))
 ```
 
