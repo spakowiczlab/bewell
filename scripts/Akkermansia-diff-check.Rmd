@@ -12,7 +12,8 @@ library(tidyverse)
 ```
 
 ```{r cars}
-x <- read_csv("../data/derived/bewell_akkermansia.csv")
+#x <- read_csv("../data/derived/bewell_akkermansia.csv")
+x <- read_csv("/fs/ess/PAS1695/projects/bewell/data/bewell_akkermansia.csv")
 ```
 ```{r}
 y <- 

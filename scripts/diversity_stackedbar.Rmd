@@ -1,0 +1,145 @@
+---
+title: "change_in_diversity"
+author: "Caroline Wheeler"
+date: "2/14/2022"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+
+library(tidyverse)
+library(ggplot2)
+library(RColorBrewer)
+library(forcats)
+library(ggforce)
+library(patchwork)
+```
+
+read in data
+```{r}
+df <- read.csv("/fs/ess/PAS1695/projects/bewell/data/bewell_taxonomy_relAbun.csv")
+```
+
+Seperate taxonomy variable by level of taxononmy
+```{r}
+taxa <- df %>% 
+  separate(Taxonomy, c("Kingdom", "Phylum", "Class", "Order", "Family", "Genus"), "\\|")
+```
+
+# Create functions to filter, select best generalization, and plot
+```{r}
+get_phyl_ra <- function(exora){
+  exora.phyl <- exora %>%
+  group_by(sample) %>%
+  mutate(tot.ra = sum(RelAbun),
+         exo.ra = RelAbun/tot.ra) %>%
+  ungroup() %>%
+  group_by(sample, Phylum) %>%
+  summarise(ra = sum(exo.ra, na.rm = T)) %>%
+  as.data.frame()
+}
+```
+
+# Call functions
+```{r, include=FALSE}
+taxa <- taxa %>%
+  filter(!is.na(Phylum))
+
+exora.p <- get_phyl_ra(taxa)
+
+large.phyls <- exora.p %>% 
+  group_by(Phylum) %>%
+  summarize(median.ra = median(ra)) %>%
+  arrange(desc(median.ra)) %>%
+  mutate(x = row_number()) %>%
+  dplyr::filter(x <= 7)
+large.phyls <- large.phyls$Phylum
+
+tmp <- exora.p %>% arrange(desc(ra))
+sampord.orter <- tmp$sample
+```
+
+# Join with sample data
+```{r}
+vars <- df %>% select(sample, variable) %>% distinct()
+exora.p.hist <- vars %>%
+  right_join(exora.p)
+```
+
+```{r}
+exora.p.hist <- exora.p.hist %>%
+  mutate(Phylum = ifelse(Phylum %in% large.phyls, Phylum, "Other"),
+           Phylum = gsub("^p__", "", Phylum))
+```
+
+Get pre/post BRB
+```{r}
+BRB <- exora.p.hist %>%
+  filter(variable == "rB" | variable == "tB")
+```
+
+Get pre/post placebo
+```{r}
+Plac <- exora.p.hist %>%
+  filter(variable == "rP" | variable == "tP")
+```
+
+
+# Plot pre/post BRB
+```{r}
+gB <- BRB %>% 
+  ggplot(aes(x = sample, y = ra, fill = Phylum)) +
+    geom_bar(position="fill", stat = "identity") +
+    labs(x = "", y = "") +
+    scale_fill_manual(values = c("darkslateblue", "darkgoldenrod2","cornflowerblue", "darkgreen", "darkorange4","salmon2", "cornflowerblue", "deeppink4" ,"cyan4", "salmon2"), name = "Taxa") +
+    theme_minimal(base_size = 18) +
+    theme(axis.text.x = element_blank(), 
+          axis.ticks.x = element_blank(),
+          axis.text.y = element_blank(),
+          panel.grid.major = element_blank())  +
+   facet_row(vars(variable), scales = "free_x", space = "free") 
+
+gB
+```
+
+Plot Placebo
+```{r}
+gP <- Plac %>% 
+  ggplot(aes(x = sample, y = ra, fill = Phylum)) +
+    geom_bar(position="fill", stat = "identity") +
+    labs(x = "", y = "") +
+    scale_fill_manual(values = c("darkslateblue", "darkgoldenrod2","cornflowerblue", "darkgreen", "darkorange4","salmon2", "cornflowerblue", "deeppink4" ,"cyan4", "salmon2"), name = "Taxa") +
+    theme_minimal(base_size = 18) +
+    theme(axis.text.x = element_blank(), 
+          axis.ticks.x = element_blank(),
+          axis.text.y = element_blank(),
+          panel.grid.major = element_blank())  +
+   facet_row(vars(variable), scales = "free_x", space = "free") 
+
+gP
+```
+
+Plot together
+```{r}
+g <- exora.p.hist %>% 
+  ggplot(aes(x = sample, y = ra, fill = Phylum)) +
+    geom_bar(position="fill", stat = "identity") +
+    labs(x = "", y = "") +
+    scale_fill_manual(values = c("darkslateblue", "darkgoldenrod2","cornflowerblue", "darkgreen", "darkorange4","salmon2", "cornflowerblue", "deeppink4" ,"cyan4", "salmon2"), name = "Taxa") +
+    theme_minimal(base_size = 18) +
+    theme(axis.text.x = element_blank(), 
+          axis.ticks.x = element_blank(),
+          axis.text.y = element_blank(),
+          panel.grid.major = element_blank())  +
+   facet_row(vars(variable), scales = "free_x", space = "free") 
+
+g
+```
+
+
+```{r}
+ggsave(plot = gB, file = "/users/PAS1695/whee57/Github/bewell/figures/BRB_stacked_bar.png", dev = "png", width = 13, height = 13)
+ggsave(plot = gP, file = "/users/PAS1695/whee57/Github/bewell/figures/Placebo_stacked_bar.png", dev = "png", width = 13, height = 13)
+ggsave(plot = g, file = "/users/PAS1695/whee57/Github/bewell/figures/BRB-Placebo_stacked_bar.png", dev = "png", width = 26, height = 13)
+```
