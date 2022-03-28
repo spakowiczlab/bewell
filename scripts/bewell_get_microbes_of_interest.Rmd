@@ -107,7 +107,7 @@ for (microbe in rownames(BRBresults)) {
 
 save BRBresults
 ```{r}
-write.csv(BRBresults, "../data/derived/BRBmicrobiomeResults.csv")
+write.csv(BRBresults, "../data/derived/03-28-22_BRBmicrobiomeResults.csv")
 ```
 
 add direction to Placebo results table
@@ -119,7 +119,7 @@ for (microbe in rownames(resultsPlacebo)) {
 
 save Placresults
 ```{r}
-write.csv(resultsPlacebo, "../data/derived/PlaceboMicrobiomeResults.csv")
+write.csv(resultsPlacebo, "../data/derived/03-28-22_PlaceboMicrobiomeResults.csv")
 ```
 
 <!-- Top 5 -->
@@ -133,8 +133,7 @@ sigMics <- allMics[, which((colnames(allMics) %in% rownames(BRBresults))==TRUE)]
 sigMics <- sigMics %>%
   mutate(time = rownames(sigMics)) %>%
   mutate(time = substr(time, nchar(time)-1, nchar(time))) %>%
-  filter(time == "rB" | time == "tB") %>%
-  select(-s__Oscillibacter_sp_57_20)
+  filter(time == "rB" | time == "tB")
   
 sigMics <- melt(sigMics)
 
