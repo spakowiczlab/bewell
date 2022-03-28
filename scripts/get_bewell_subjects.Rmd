@@ -73,7 +73,7 @@ juice <- juice %>%
          rP = ifelse(rP %in% bars, rP, NA),
          tP = ifelse(tP %in% bars, tP, NA))
 
-juice[3, 6] <- "HONC60-05-v3.1"
+#juice[3, 6] <- "HONC60-05-v3.1" # This sample is faulty - shouldn't be included
 juice[4, 6] <- "HONC60-07-v3.1"
 juice[7, 4] <- "HONC60-21-v1.1"
 #juice[1, 4] <- "HONC60-21-v1.1"
