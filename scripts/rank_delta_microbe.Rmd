@@ -14,13 +14,13 @@ library(reshape2)
 
 ```{r}
 #taxa <- read.csv("/fs/ess/PAS1695/projects/bewell/data/bewell_taxonomy_relAbun.csv")
-king <- read.csv("/fs/ess/PAS1695/projects/bewell/data/RelAbun/a_RelAbun_king.csv", row.names = 1)
-phyl <- read.csv("/fs/ess/PAS1695/projects/bewell/data/RelAbun/a_RelAbun_phyl.csv",row.names = 1)
-class <- read.csv("/fs/ess/PAS1695/projects/bewell/data/RelAbun/a_RelAbun_class.csv",row.names = 1)
-ord <- read.csv("/fs/ess/PAS1695/projects/bewell/data/RelAbun/a_RelAbun_ord.csv", row.names = 1)
-fam <- read.csv("/fs/ess/PAS1695/projects/bewell/data/RelAbun/a_RelAbun_fam.csv", row.names = 1)
-gen <- read.csv("/fs/ess/PAS1695/projects/bewell/data/RelAbun/a_RelAbun_gen.csv", row.names = 1)
-spec <- read.csv("/fs/ess/PAS1695/projects/bewell/data/RelAbun/a_RelAbun_spec.csv", row.names = 1)
+king <- read.csv("/fs/ess/PAS1695/projects/bewell/data/RelAbun/RelAbun_king.csv", row.names = 1)
+phyl <- read.csv("/fs/ess/PAS1695/projects/bewell/data/RelAbun/RelAbun_phyl.csv",row.names = 1)
+class <- read.csv("/fs/ess/PAS1695/projects/bewell/data/RelAbun/RelAbun_class.csv",row.names = 1)
+ord <- read.csv("/fs/ess/PAS1695/projects/bewell/data/RelAbun/RelAbun_ord.csv", row.names = 1)
+fam <- read.csv("/fs/ess/PAS1695/projects/bewell/data/RelAbun/RelAbun_fam.csv", row.names = 1)
+gen <- read.csv("/fs/ess/PAS1695/projects/bewell/data/RelAbun/RelAbun_gen.csv", row.names = 1)
+spec <- read.csv("/fs/ess/PAS1695/projects/bewell/data/RelAbun/RelAbun_spec.csv", row.names = 1)
 
 taxa <- cbind(king, phyl, class, ord, fam, gen, spec)
 
@@ -89,11 +89,6 @@ Subject 55
 ```{r}
 sub55 <- delta %>%
   filter(subject == 55)
-```
-
-AKK test
-```{r}
-relAbun <- read.csv("/fs/ess/PAS1695/projects/bewell/data/bewell_taxonomy_relAbun.csv")
 ```
 
 
