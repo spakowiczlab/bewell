@@ -16,7 +16,7 @@ library(tidyverse)
 ```{r}
 cytokines <- read.csv("../data/derived/cytokines_avg-results.csv", stringsAsFactors = F)
 
-samplabs <- read.csv("/fs/ess/PAS1695/projects/bewell/data/timepoint_key.csv")
+samplabs <- read.csv("../data/derived/timepoint_key.csv")
 ```
 
 
@@ -25,7 +25,8 @@ samplabs <- read.csv("/fs/ess/PAS1695/projects/bewell/data/timepoint_key.csv")
 ```{r}
 samplab.form <- samplabs %>%
   select(Subject.Number, placebo)
-cyto.form <- cytokines %>%
+
+pre.cyto.form <- cytokines %>%
   separate(Sample, into = c("Subject.Number", "timepoint"), sep = "-") %>%
   mutate(Subject.Number = as.numeric(gsub("^0", "", Subject.Number)),
          timepoint = gsub("\\.1", "", timepoint)) %>%
@@ -37,7 +38,10 @@ cyto.form <- cytokines %>%
                                   placebo == "Week 6" & timepoint == "3" ~ "pre.P",
                                   placebo == "Week 6" & timepoint == "4" ~ "post.P",
                                   placebo == "Week 6" & timepoint == "1" ~ "pre.BRB",
-                                  placebo == "Week 6" & timepoint == "2" ~ "post.BRB")) %>%
+                                  placebo == "Week 6" & timepoint == "2" ~ "post.BRB"))
+
+cyto.form <- 
+  pre.cyto.form %>%
   filter(grepl("BRB", study.tpoint)) %>%
   select(Subject.Number, study.tpoint, cytokine, avg.res) %>%
   spread(key = study.tpoint, value = avg.res)
@@ -95,3 +99,133 @@ names(nonnorm.tests) <- norm.fail
 ```{r}
 nonnorm.tests
 ```
+
+```{r}
+cyto.form %>%
+  gather(-Subject.Number, -cytokine, key = "study.visit",
+         value = "cytokine.amount") %>%
+  ggplot(aes(x = study.visit, y = cytokine.amount)) +
+    geom_boxplot(aes(fill = study.visit), 
+                 show.legend = FALSE) +
+  facet_wrap(~cytokine, scales = "free")
+ggsave("../figures/exploratory-cytokines_boxplots_facet.png",
+       width = 6.5, height = 9)
+```
+
+```{r}
+run_cyto_ttest <- function(x){
+  tmp <- cyto.form %>%
+    filter(cytokine == x)
+  
+  t.test(tmp[[grep("pre"), names(tmp)]], 
+         tmp[[grep("post", names(tmp))]], 
+         paired = T)
+}
+
+run_cyto_wilcox <- function(x){
+  tmp <- cyto.form %>%
+    filter(cytokine == x)
+  
+  wilcox.test(tmp[[grep("pre"), names(tmp)]], 
+              tmp[[grep("post", names(tmp))]], 
+              paired = T)
+}
+
+cytokineDifferenceSigTests <- function(interventionInitial) {
+  cyto.form <- 
+  pre.cyto.form %>%
+  filter(grepl(interventionInitial, study.tpoint)) %>%
+  select(Subject.Number, study.tpoint, cytokine, avg.res) %>%
+  spread(key = study.tpoint, value = avg.res) %>%
+  
+  check.norm.dists <- 
+    cyto.form %>%
+  mutate(dif.brb = post - pre) %>%
+  group_by(cytokine) %>%
+  mutate(norm.test = shapiro.test(dif.brb)$p.value) %>%
+  ungroup() %>%
+  select(cytokine, norm.test) %>%
+  distinct()
+
+norm.pass <- filter(check.norm.dists, norm.test > 0.05)$cytokine
+norm.fail <- filter(check.norm.dists, norm.test < 0.05)$cytokine
+
+norm.ttests <- lapply(norm.pass, function(x) run_cyto_ttest(x))
+names(norm.ttests) <- norm.pass
+
+nonnorm.tests <- lapply(norm.fail, function(x) run_cyto_wilcox(x))
+names(nonnorm.tests) <- norm.fail
+
+output[[1]] <- norm.ttests
+output[[2]] <- nonnorm.tests
+}
+
+cytokineDifferenceSigTests("B")
+```
+
+
+# Check this all on placebo
+
+```{r}
+
+
+cyto.form <- 
+  pre.cyto.form %>%
+  filter(grepl("P", study.tpoint)) %>%
+  select(Subject.Number, study.tpoint, cytokine, avg.res) %>%
+  spread(key = study.tpoint, value = avg.res)
+
+
+check.norm.dists <- cyto.form %>%
+  mutate(dif.brb = post.P - pre.P) %>%
+  group_by(cytokine) %>%
+  mutate(norm.test = shapiro.test(dif.brb)$p.value) %>%
+  ungroup() %>%
+  select(cytokine, norm.test) %>%
+  distinct()
+
+norm.pass <- filter(check.norm.dists, norm.test > 0.05)$cytokine
+norm.fail <- filter(check.norm.dists, norm.test < 0.05)$cytokine
+```
+
+# Run T tests
+
+```{r}
+run_cyto_ttest <- function(x){
+  tmp <- cyto.form %>%
+    filter(cytokine == x)
+  
+  t.test(tmp$pre.P, tmp$post.P, paired = T)
+}
+```
+
+```{r}
+norm.ttests <- lapply(norm.pass, function(x) run_cyto_ttest(x))
+names(norm.ttests) <- norm.pass
+```
+
+```{r}
+norm.ttests
+```
+
+# Run Wilcoxon tests
+
+```{r}
+run_cyto_wilcox <- function(x){
+  tmp <- cyto.form %>%
+    filter(cytokine == x)
+  
+  wilcox.test(tmp$pre.P, tmp$post.P, paired = T)
+}
+```
+
+```{r}
+nonnorm.tests <- lapply(norm.fail, function(x) run_cyto_wilcox(x))
+names(nonnorm.tests) <- norm.fail
+```
+
+```{r}
+nonnorm.tests
+```
+
+
