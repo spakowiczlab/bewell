@@ -53,13 +53,16 @@ make_df <- function(mic) {
 
 get_rank_BRB <- function(df) {
   df <- df %>% 
-    select(subject, microbe, BRB, Plac) 
+    select(subject, microbe, BRB, Plac) %>%
+    mutate(BRBchange = abs(BRB),
+         PLACchange = abs(Plac)) %>%
+    arrange(-BRBchange)
   
   return(df)
 }
 ```
 
-```{r}
+```{r message=FALSE, error=FALSE, eval=FALSE}
 delta <- data.frame(matrix(ncol = 2, nrow = 0))
 colnames(delta) <- c("microbe", "BRBchange")
 
@@ -67,21 +70,26 @@ for (microbe in mics) {
   temp <- make_df(microbe)
   temp <- get_rank_BRB(temp)
   
-  delta <- rbind(delta, temp)
+  delta <- rbind(delta, temp) %>%
+  arrange(-BRBchange)
 }
-
-delta <- delta %>%
-  mutate(BRBchange = abs(BRB),
-         PLACchange = abs(Plac))
 ```
 
 ```{r}
-delta <- delta %>%
-  arrange(-BRBchange)
-
-write_csv(delta, "/fs/ess/PAS1695/projects/bewell/data/rankedDeltaMicrobe.csv")
+write_csv(delta, "/fs/ess/PAS1695/projects/bewell/data/CompleterankedDeltaMicrobe.csv")
 ```
 
+Akkermansia example
+```{r}
+AKK <- make_df("s__Akkermansia_muciniphila")
+AKK <- get_rank_BRB(AKK)
+```
+
+Subject 55
+```{r}
+sub55 <- delta %>%
+  filter(subject == 55)
+```
 
 
 
