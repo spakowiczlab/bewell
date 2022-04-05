@@ -91,6 +91,22 @@ sub55 <- delta %>%
   filter(subject == 55)
 ```
 
+## Cytokines
+
+read in cytokine data
+```{r}
+cyto <- read.csv("../data/derived/cytokines_avg-results.csv")
+bars <- read.csv("/fs/ess/PAS1695/projects/bewell/data/participants/bewell_barcodes.csv")
+subs <- read.csv("/fs/ess/PAS1695/projects/bewell/data/participants/bewell_subjects.csv")
+```
+
+make timepoint variable 
+```{r}
+cyto <- cyto %>%
+  mutate(timepoint = )
+```
+
+
 
 
 
