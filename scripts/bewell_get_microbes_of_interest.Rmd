@@ -138,9 +138,20 @@ sigMics <- sigMics %>%
   
 sigMics <- melt(sigMics)
 
-bp <- ggplot(sigMics, aes(x=time, y=value)) + geom_boxplot(aes(fill=time)) + xlab("") + ylab("Relative Abundance") + labs(fill = "") + theme_bw(base_size = 25) + theme(axis.text.x = element_text(angle = 45, hjust=1)) + scale_fill_manual(values=c("red3", "cornflowerblue")) + facet_wrap(. ~ variable, scales = "free")
+bp <- 
+  sigMics %>%
+  ggplot(aes(x=time, y=value)) + 
+  geom_violin(aes(color = time), show.legend = FALSE) +
+  geom_boxplot(aes(fill=time), width = 0.1) + 
+  geom_jitter(alpha = 0.2, width = 0.3) +
+  xlab("") + ylab("Relative Abundance") + 
+  labs(fill = "") + 
+  theme_bw() +
+  theme(axis.text.x = element_text(angle = 45, hjust=1)) + 
+  scale_fill_manual(values=c("red3", "cornflowerblue")) + 
+  facet_wrap(. ~ variable, scales = "free", ncol = 4)
   
 bp
 
-ggsave(filename = "../figures/microbiomeBP.png", plot = bp, width = 25, height = 25, dpi = 300)
+ggsave(filename = "../figures/aacr22_microbiomeBP.png", plot = bp, width = 12, height = 5.5, dpi = 300)
 ```
