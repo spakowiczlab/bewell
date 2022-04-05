@@ -89,3 +89,16 @@ save CSV with all subjects
 write_csv(juice, file.path(paths$box, "bewell_subjects.csv"))
 ```
 
+```{r}
+newdf <- juice %>% select(Subject.Number, rB, tB, rP, tP)
+newdf = gather(newdf, Subject.Number) %>%
+  mutate(timepoint =substr(str_remove(value, "v"), 8, length(value)))
+
+newdf <- newdf[complete.cases(newdf), ]
+```
+
+```{r}
+write_csv(newdf, file.path("../data/derived/bewell_barcodes.csv"))
+```
+
+
