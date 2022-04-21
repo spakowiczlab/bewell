@@ -1,0 +1,21 @@
+---
+title: "fig"
+author: "Caroline Wheeler"
+date: "4/21/2022"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+read in data
+```{r}
+taxa <- read.csv("/fs/ess/PAS1695/projects/bewell/data/bewell_taxonomy_relAbun.csv")
+```
+
+```{r}
+
+```
+
+
