@@ -1,7 +1,7 @@
 ---
 title: "cytokines effect size"
 author: "Bailey Conrad"
-date: "`r Sys.Date()`"
+date: "May 31, 2022"
 output: html_document
 ---
 
@@ -83,7 +83,8 @@ return(mods.df)
 
 ```{r}
 capture.models.univ(outcome = "berry.group", lfun = "binomial", cytos = object, modin = cyto.form) %>%
-  filter(p.value<0.1) 
+  filter(p.value<0.1) %>%
+  mutate(term = fct_reorder(term, estimate))
   # separate(term, into = c("TaxaLevel", "term"), sep = "__") %>%
   # mutate(term = fct_reorder(term, estimate),
   #        ) %>%
@@ -93,7 +94,6 @@ capture.models.univ(outcome = "berry.group", lfun = "binomial", cytos = object, 
 #   # scale_fill_manual(breaks = c("g", "s"), values = c("firebrick", "grey70"), name = "Taxonomic level", labels = c("Genus", "Species")) +
 #   theme_bw()  +
 #   theme(axis.text.y = element_markdown())
-# 
 # ggsave("../figures/effect-size_cytokines.png")
 ```
 
