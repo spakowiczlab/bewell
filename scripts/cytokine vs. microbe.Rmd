@@ -48,12 +48,17 @@ cyto.form <- cytokines %>%
  select(-X) %>% pivot_wider(names_from = cytokine, values_from = avg.res) %>%
   mutate(Sample = gsub("^0", "", Sample), Sample = gsub("\\.1$", "", Sample)) %>%
   left_join(samplab.form) %>%
-  mutate(berry.group = ifelse(grepl("postBRB",timepoint.label), 1, 0)) %>%
-  left_join(cytokines)
+  mutate(berry.group = ifelse(grepl("postBRB",timepoint.label), 1, 0))
 ```
+
 #all of this is modin
 ```{r}
-cyto.form %>% select(timepoint.label) %>% pivot_wider(names_from = all_of(cytokines), values_from = "postBRB") 
+# cyto.form %>% pivot_longer(names_to = "berry.group", values_to = c("ALCAM.CD166", "C.Reactive.Protein.CRP", "CCL2.JE.MCP.1", "Complement.Component.C9", "Cystatin.C", "IL.1.beta.IL.1F2", "IL.10", "IL.12.IL.23.p40", "IL.6", "MMP.2"))
+#   
+#   
+#   # select(-Sample) %>% pivot_wider(names_from = values_from = c("ALCAM.CD166", "C.Reactive.Protein.CRP", "CCL2.JE.MCP.1", "Complement.Component.C9", "Cystatin.C", "IL.1.beta.IL.1F2", "IL.10", "IL.12.IL.23.p40", "IL.6", "MMP.2"))
+#   
+#   # pivot_wider(names_from = cytokine, values_from = berry.group) 
 ```
 
 ```{r}
@@ -75,25 +80,21 @@ return(mods.df)
 }
 ```
 
-```{r}
-all_res <- 
-```
-
 
 ```{r}
 capture.models.univ(outcome = "berry.group", lfun = "binomial", cytos = object, modin = cyto.form) %>%
-  filter(p.value<0.1) %>%
+  filter(p.value<0.1) 
   # separate(term, into = c("TaxaLevel", "term"), sep = "__") %>%
   # mutate(term = fct_reorder(term, estimate),
   #        ) %>%
-ggplot(aes(x = avg.res, y = cytokines)) +
-  geom_col() +
-  labs(x = "Effect Size", y = "Microbe") +
-  # scale_fill_manual(breaks = c("g", "s"), values = c("firebrick", "grey70"), name = "Taxonomic level", labels = c("Genus", "Species")) +
-  theme_bw()  +
-  theme(axis.text.y = element_markdown())
-
-ggsave("../figures/effect-size_cytokines.png")
+# ggplot(aes(x = estimate, y = term)) +
+#   geom_col() +
+#   labs(x = "Effect Size", y = "Microbe") +
+#   # scale_fill_manual(breaks = c("g", "s"), values = c("firebrick", "grey70"), name = "Taxonomic level", labels = c("Genus", "Species")) +
+#   theme_bw()  +
+#   theme(axis.text.y = element_markdown())
+# 
+# ggsave("../figures/effect-size_cytokines.png")
 ```
 
 
