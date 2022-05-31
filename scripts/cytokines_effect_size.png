@@ -1,0 +1,100 @@
+---
+title: "cytokines effect size"
+author: "Bailey Conrad"
+date: "May 31, 2022"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+
+library(tidyverse)
+library(glmm)
+library(broom)
+library(rlist)
+library(ggrepel)
+library(ggtext)
+library(ggplot2)
+```
+
+
+```{r}
+cytokines <- read.csv("/Users/baileyconrad/Desktop/bewell/data/derived/cytokines_avg-results.csv", stringsAsFactors = F)
+samplabs <- read.csv("../data/derived/timepoint_key.csv")
+```
+
+Converting data into wide format from long format. 
+```{r}
+cytokines %>% select(-X) %>% pivot_wider(names_from = cytokine, values_from = avg.res)
+```
+
+
+```{r}
+#piping manipulations until you have what you want
+#all we want is sample id and berry group (labels for all 4 groups)
+#we are testing post BRB to preP, postP, and preBRB
+samplab.form <- samplabs %>%
+  select(Subject.Number, placebo) %>%
+  mutate(preP = ifelse(placebo == "Week 0", 1, 3), #quote bc exact string #==; is equal to operator #true = 1, false =3
+         postP = ifelse(placebo == "Week 0", 2, 4), 
+         preBRB = ifelse(placebo == "Week 0", 3, 1),
+        postBRB = ifelse(placebo == "Week 0", 4, 2)) %>%
+  pivot_longer(names_to = "timepoint.label", values_to = "timepoints", cols = c("preP", "postP", "preBRB", "postBRB")) %>%
+  mutate(Sample = paste0(Subject.Number, "-", timepoints)) %>%
+  select(Sample, timepoint.label) 
+
+
+cyto.form <- cytokines %>%
+ select(-X) %>% pivot_wider(names_from = cytokine, values_from = avg.res) %>%
+  mutate(Sample = gsub("^0", "", Sample), Sample = gsub("\\.1$", "", Sample)) %>%
+  left_join(samplab.form) %>%
+  mutate(berry.group = ifelse(grepl("postBRB",timepoint.label), 1, 0))
+```
+
+#all of this is modin
+```{r}
+# cyto.form %>% pivot_longer(names_to = "berry.group", values_to = c("ALCAM.CD166", "C.Reactive.Protein.CRP", "CCL2.JE.MCP.1", "Complement.Component.C9", "Cystatin.C", "IL.1.beta.IL.1F2", "IL.10", "IL.12.IL.23.p40", "IL.6", "MMP.2"))
+#   
+#   
+#   # select(-Sample) %>% pivot_wider(names_from = values_from = c("ALCAM.CD166", "C.Reactive.Protein.CRP", "CCL2.JE.MCP.1", "Complement.Component.C9", "Cystatin.C", "IL.1.beta.IL.1F2", "IL.10", "IL.12.IL.23.p40", "IL.6", "MMP.2"))
+#   
+#   # pivot_wider(names_from = cytokine, values_from = berry.group) 
+```
+
+```{r}
+object <- c("ALCAM.CD166", "C.Reactive.Protein.CRP", "CCL2.JE.MCP.1", "Complement.Component.C9", "Cystatin.C", "IL.1.beta.IL.1F2", "IL.10", "IL.12.IL.23.p40", "IL.6", "MMP.2")
+# object <- unique(cytokines$cytokine): same thing as above 
+
+#arguments: we want to make = to the variables; must be defined prior to function 
+#variable: object making in R that shows in environment
+#outcome = label to a column
+#binomial and logistic regression
+#cytos: testing against outcome
+#modin: data frame with all the columns
+capture.models.univ <- function(outcome, lfun, cytos, modin) {
+  mods.list <- lapply(cytos, function(x)  try({glm(as.formula(paste0(outcome, " ~ ", x)), family = lfun, data = modin) %>% tidy()}))
+  
+mods.list.clean <- list.clean(mods.list, function(x) is.null(x))
+mods.df <- bind_rows(mods.list.clean)
+return(mods.df)
+}
+```
+
+
+```{r}
+capture.models.univ(outcome = "berry.group", lfun = "binomial", cytos = object, modin = cyto.form) %>%
+  filter(p.value<0.1) %>%
+  mutate(term = fct_reorder(term, estimate))
+  # separate(term, into = c("TaxaLevel", "term"), sep = "__") %>%
+  # mutate(term = fct_reorder(term, estimate),
+  #        ) %>%
+# ggplot(aes(x = estimate, y = term)) +
+#   geom_col() +
+#   labs(x = "Effect Size", y = "Microbe") +
+#   # scale_fill_manual(breaks = c("g", "s"), values = c("firebrick", "grey70"), name = "Taxonomic level", labels = c("Genus", "Species")) +
+#   theme_bw()  +
+#   theme(axis.text.y = element_markdown())
+# ggsave("../figures/effect-size_cytokines.png")
+```
+
+
