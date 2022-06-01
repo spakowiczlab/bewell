@@ -51,16 +51,6 @@ cyto.form <- cytokines %>%
   mutate(berry.group = ifelse(grepl("postBRB",timepoint.label), 1, 0))
 ```
 
-#all of this is modin
-```{r}
-# cyto.form %>% pivot_longer(names_to = "berry.group", values_to = c("ALCAM.CD166", "C.Reactive.Protein.CRP", "CCL2.JE.MCP.1", "Complement.Component.C9", "Cystatin.C", "IL.1.beta.IL.1F2", "IL.10", "IL.12.IL.23.p40", "IL.6", "MMP.2"))
-#   
-#   
-#   # select(-Sample) %>% pivot_wider(names_from = values_from = c("ALCAM.CD166", "C.Reactive.Protein.CRP", "CCL2.JE.MCP.1", "Complement.Component.C9", "Cystatin.C", "IL.1.beta.IL.1F2", "IL.10", "IL.12.IL.23.p40", "IL.6", "MMP.2"))
-#   
-#   # pivot_wider(names_from = cytokine, values_from = berry.group) 
-```
-
 ```{r}
 object <- c("ALCAM.CD166", "C.Reactive.Protein.CRP", "CCL2.JE.MCP.1", "Complement.Component.C9", "Cystatin.C", "IL.1.beta.IL.1F2", "IL.10", "IL.12.IL.23.p40", "IL.6", "MMP.2")
 # object <- unique(cytokines$cytokine): same thing as above 
@@ -81,11 +71,27 @@ return(mods.df)
 ```
 
 
-```{r}
+```{r warning=FALSE}
 capture.models.univ(outcome = "berry.group", lfun = "binomial", cytos = object, modin = cyto.form) %>%
-  filter(p.value<0.1) %>%
-  mutate(term = fct_reorder(term, estimate))
-  # separate(term, into = c("TaxaLevel", "term"), sep = "__") %>%
+  filter(p.value<1.0) %>%
+  filter(term !="(Intercept)") %>%
+  mutate(term = fct_reorder(term, estimate)) %>%
+  mutate(pointlabs = ifelse(p.value < 0.1, term, NA)) %>%
+ggplot(aes(x = estimate, y = -log(p.value), label = pointlabs, color = term)) +
+  geom_point() +
+  theme_bw() +
+  labs(x = "Estimate", y = "-log(p-value)") +
+  scale_color_discrete(name = "Cytokines", breaks = c("ALCAM.CD166", "C.Reactive.Protein.CRP", "CCL2.JE.MCP.1", "Complement.Component.C9", "Cystatin.C", "IL.1.beta.IL.1F2", "IL.10", "IL.12.IL.23.p40", "IL.6", "MMP.2"), labels = c("CD166", "C-Reactive Protein", "CCL2/JE/MCP-1", "Complement Component C9", "Cystatin C", "IL-1 beta/IL-1F2", "IL-10", "IL-12/IL-23 p40", "IL-6", "MMP-2"))
+
+ggsave("../figures/cytokine_effect-size_volcano-plot.png")
+
+```
+```
+
+
+#SCRATCH WORK BELOW
+```{r}
+ # separate(term, into = c("TaxaLevel", "term"), sep = "__") %>%
   # mutate(term = fct_reorder(term, estimate),
   #        ) %>%
 # ggplot(aes(x = estimate, y = term)) +
@@ -96,6 +102,5 @@ capture.models.univ(outcome = "berry.group", lfun = "binomial", cytos = object, 
 #   theme(axis.text.y = element_markdown())
 # ggsave("../figures/effect-size_cytokines.png")
 ```
-
 
 
