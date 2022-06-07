@@ -55,11 +55,11 @@ cyto.form <- cytokines %>%
   mutate(Sample = gsub("^0", "", Sample), Sample = gsub("\\.1$", "", Sample)) %>%
   left_join(samplab.form) %>%
   mutate(berry.group = ifelse(grepl("postBRB",timepoint.label), 1, 0)) %>%
-  filter(Smoking.status=="former")
+  filter(Smoking.status=="former") 
 ```
 
 ```{r}
-object <- c("ALCAM.CD166", "C.Reactive.Protein.CRP", "CCL2.JE.MCP.1", "Complement.Component.C9", "Cystatin.C", "IL.1.beta.IL.1F2", "IL.10", "IL.12.IL.23.p40", "IL.6", "MMP.2")
+object <- c("ALCAM.CD166", "C.Reactive.Protein.CRP", "CCL2.JE.MCP.1", "Complement.Component.C9", "Cystatin.C", "IL.1.beta.IL.1F2", "IL.10", "IL.12.IL.23.p40", "IL.6", "MMP.2", "S100A9", "TNF.alpha", "vWF.A2")
 # object <- unique(cytokines$cytokine): same thing as above 
 
 #arguments: we want to make = to the variables; must be defined prior to function 
@@ -88,7 +88,7 @@ ggplot(aes(x = estimate, y = -log(p.value), label = pointlabs, color = term)) +
   geom_point() +
   theme_bw() +
   labs(x = "Estimate", y = "-log(p-value)") +
-  scale_color_discrete(name = "Cytokines", breaks = c("ALCAM.CD166", "C.Reactive.Protein.CRP", "CCL2.JE.MCP.1", "Complement.Component.C9", "Cystatin.C", "IL.1.beta.IL.1F2", "IL.10", "IL.12.IL.23.p40", "IL.6", "MMP.2"), labels = c("CD166", "C-Reactive Protein", "CCL2/JE/MCP-1", "Complement Component C9", "Cystatin C", "IL-1 beta/IL-1F2", "IL-10", "IL-12/IL-23 p40", "IL-6", "MMP-2")) +
+ scale_color_discrete(name = "Cytokines", breaks = c("ALCAM.CD166", "C.Reactive.Protein.CRP", "CCL2.JE.MCP.1", "Complement.Component.C9", "Cystatin.C", "IL.1.beta.IL.1F2", "IL.10", "IL.12.IL.23.p40", "IL.6", "MMP.2", "S100A9", "TNF.alpha", "vWF.A2"), labels = c("CD166", "C-Reactive Protein", "CCL2/JE/MCP-1", "Complement Component C9", "Cystatin C", "IL-1 beta/IL-1F2", "IL-10", "IL-12/IL-23 p40", "IL-6", "MMP-2", "S100A9", "TNF alpha", "vWF-A2")) +
   xlim(-0.75, 0.75) +
   ggtitle("Effect Size of Cytokines in Former Smokers")+
   theme(plot.title = element_text(hjust = 0.5))

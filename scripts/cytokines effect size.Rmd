@@ -52,7 +52,7 @@ cyto.form <- cytokines %>%
 ```
 
 ```{r}
-object <- c("ALCAM.CD166", "C.Reactive.Protein.CRP", "CCL2.JE.MCP.1", "Complement.Component.C9", "Cystatin.C", "IL.1.beta.IL.1F2", "IL.10", "IL.12.IL.23.p40", "IL.6", "MMP.2")
+object <- c("ALCAM.CD166", "C.Reactive.Protein.CRP", "CCL2.JE.MCP.1", "Complement.Component.C9", "Cystatin.C", "IL.1.beta.IL.1F2", "IL.10", "IL.12.IL.23.p40", "IL.6", "MMP.2", "S100A9", "TNF.alpha", "vWF.A2")
 # object <- unique(cytokines$cytokine): same thing as above 
 
 #arguments: we want to make = to the variables; must be defined prior to function 
@@ -81,7 +81,7 @@ ggplot(aes(x = estimate, y = -log(p.value), label = pointlabs, color = term)) +
   geom_point() +
   theme_bw() +
   labs(x = "Estimate", y = "-log(p-value)") +
-  scale_color_discrete(name = "Cytokines", breaks = c("ALCAM.CD166", "C.Reactive.Protein.CRP", "CCL2.JE.MCP.1", "Complement.Component.C9", "Cystatin.C", "IL.1.beta.IL.1F2", "IL.10", "IL.12.IL.23.p40", "IL.6", "MMP.2"), labels = c("CD166", "C-Reactive Protein", "CCL2/JE/MCP-1", "Complement Component C9", "Cystatin C", "IL-1 beta/IL-1F2", "IL-10", "IL-12/IL-23 p40", "IL-6", "MMP-2"))
+  scale_color_discrete(name = "Cytokines", breaks = c("ALCAM.CD166", "C.Reactive.Protein.CRP", "CCL2.JE.MCP.1", "Complement.Component.C9", "Cystatin.C", "IL.1.beta.IL.1F2", "IL.10", "IL.12.IL.23.p40", "IL.6", "MMP.2", "S100A9", "TNF.alpha", "vWF.A2"), labels = c("CD166", "C-Reactive Protein", "CCL2/JE/MCP-1", "Complement Component C9", "Cystatin C", "IL-1 beta/IL-1F2", "IL-10", "IL-12/IL-23 p40", "IL-6", "MMP-2", "S100A9", "TNF alpha", "vWF-A2"))
 
 ggsave("../figures/cytokine_effect-size_volcano-plot.png")
 
