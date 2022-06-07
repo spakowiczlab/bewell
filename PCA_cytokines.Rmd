@@ -5,11 +5,33 @@ date: "`r Sys.Date()`"
 output: html_document
 ---
 
+CW changed file paths 
 ```{r}
-cytokines <- read.csv("/Users/baileyconrad/Desktop/bewell/data/derived/cytokines_avg-results.csv", stringsAsFactors = F)
-samplabs <- read.csv("/Users/baileyconrad/Desktop/bewell/data/derived/timepoint_key.csv")
-demos <- read.csv("/Users/baileyconrad/Documents/BEWELL demographics.csv")
+cytokines <- read.csv("./data/derived/cytokines_avg-results.csv", stringsAsFactors = F)
+samplabs <- read.csv("./data/derived/timepoint_key.csv")
+#demos <- read.csv("/Users/baileyconrad/Documents/BEWELL demographics.csv")
 ```
+
+CW 
+```{r}
+cyto.form <- cytokines %>%
+  select(-X) %>% 
+  pivot_wider(names_from = cytokine, values_from = avg.res)
+
+names <- cyto.form$Sample
+cyto.form <- cyto.form[,-1]
+row.names(cyto.form) <- names
+
+cyto.pca <- prcomp(na.omit(cyto.form) , center = TRUE)
+
+PCi<-data.frame(cyto.pca$x)
+
+PCi %>%
+  ggplot(aes(x=PC1, y=PC2)) + 
+           geom_point()
+
+```
+
 
 
 #attempting to run fxn with raw cytokines data and trying to just have numbers
