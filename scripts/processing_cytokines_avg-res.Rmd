@@ -19,16 +19,19 @@ library(ggrepel)
 cytofile.1<- "../data/raw/cytokines/13-2_20211209_173456.csv"
 cytofile.2 <- "../data/raw/cytokines/New Batch 3_20211207_210206.csv"
 cytofile.3 <- "../data/raw/cytokines/Spakowicz CRP_20220329_170324.csv"
+cytofile.4 <- "../data/raw/cytokines/Spakowicz_12_20211221_191508.csv"
 ```
 
 ```{r}
 cv.tab1 <- read.csv(cytofile.1, skip = 699)[1:47,]
 cv.tab2 <- read.csv(cytofile.2, skip = 699)[1:47,]
 cv.tab3 <- read.csv(cytofile.3, skip = 699)[1:47,]
+cv.tab4 <- read.csv(cytofile.4, skip = 704)[1:47,1:13]
 
 res.tab1 <- read.csv(cytofile.1, skip = 351)[1:96,]
 res.tab2 <- read.csv(cytofile.2, skip = 351)[1:96,]
 res.tab3 <- read.csv(cytofile.3, skip = 351)[1:96,]
+res.tab4 <- read.csv(cytofile.4, skip = 356)[1:96, 1:14]
 ```
 
 # Quick plots
@@ -106,6 +109,17 @@ res.tab3.box <-  res.tab3%>%
          is.outlier = (result > quantile(result,.75,na.rm = T ) + 1.5*iqr)|(result < quantile(result,.25,na.rm = T ) - 1.5*iqr)) %>%
   ungroup() %>%
   mutate(slab = ifelse(is.outlier == T, Sample, NA))
+
+res.tab4.box <- res.tab4 %>% 
+  filter(!grepl("Standard", Sample)) %>%
+  gather(-Sample, -Location, key = "cytokine", value = "result") %>%
+  # filter(cytokine != "Cystatin.C") %>%
+  mutate(result = as.numeric(gsub("> ", "",gsub("< ", "", result)))) %>%
+  group_by(cytokine) %>%
+  mutate(iqr = IQR(result, na.rm = T),
+         is.outlier = (result > quantile(result,.75,na.rm = T ) + 1.5*iqr)|(result < quantile(result,.25,na.rm = T ) - 1.5*iqr)) %>%
+  ungroup() %>%
+  mutate(slab = ifelse(is.outlier == T, Sample, NA))
 ```
 
 ```{r define cv outliers}
@@ -133,6 +147,15 @@ cv.out3 <- cv.tab3 %>%
   ungroup() %>%
   mutate(CV.outlier =  (CVpercent > quantile(CVpercent,.75,na.rm = T ) + 1.5*CV.iqr)) %>%
   select(Sample, cytokine, CV.outlier)
+
+cv.out4 <- cv.tab4 %>%
+  gather(-Sample, key = "cytokine", value = "CVpercent") %>%
+  mutate(CVpercent = as.numeric(CVpercent)) %>%
+  group_by(cytokine) %>%
+  mutate(CV.iqr = IQR(CVpercent, na.rm = T)) %>%
+  ungroup() %>%
+  mutate(CV.outlier =  (CVpercent > quantile(CVpercent,.75,na.rm = T ) + 1.5*CV.iqr)) %>%
+  select(Sample, cytokine, CV.outlier)
 ```
 
 ```{r table of outlier conditions}
@@ -151,6 +174,12 @@ res.out.b2 <- res.tab2.box %>%
 res.out.b3 <- res.tab3.box %>%
   select(Sample, Location, cytokine, is.outlier) %>%
   left_join(cv.out3) %>%
+  mutate(combined.outlier = is.outlier == T & CV.outlier == T) %>%
+  filter(combined.outlier == T)
+
+res.out.b4 <- res.tab4.box %>%
+  select(Sample, Location, cytokine, is.outlier) %>%
+  left_join(cv.out4) %>%
   mutate(combined.outlier = is.outlier == T & CV.outlier == T) %>%
   filter(combined.outlier == T)
 ```
@@ -176,7 +205,13 @@ res.good.3 <- res.tab3.box %>%
   group_by(Sample, cytokine) %>%
   summarize(avg.res = mean(result, na.rm = T))
 
-avg.results.tab <- bind_rows(res.good.1, res.good.2, res.good.3)
+res.good.4 <- res.tab4.box %>%
+  anti_join(res.out.b4) %>%
+  filter(!grepl("Background", Sample)) %>%
+  group_by(Sample, cytokine) %>%
+  summarize(avg.res = mean(result, na.rm = T))
+
+avg.results.tab <- bind_rows(res.good.1, res.good.2, res.good.3, res.good.4)
 ```
 
 ```{r}
