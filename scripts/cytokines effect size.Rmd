@@ -19,8 +19,8 @@ library(ggplot2)
 
 
 ```{r}
-cytokines <- read.csv("/Users/baileyconrad/Desktop/bewell/data/derived/cytokines_avg-results.csv", stringsAsFactors = F)
-samplabs <- read.csv("../data/derived/timepoint_key.csv")
+cytokines <- read.csv("/Users/baileyconrad/documents/GitHub/bewell/data/derived/cytokines_avg-results.csv")
+samplabs <- read.csv("/Users/baileyconrad/documents/GitHub/bewell/data/derived/timepoint_key.csv")
 ```
 
 Converting data into wide format from long format. 
@@ -79,9 +79,10 @@ capture.models.univ(outcome = "berry.group", lfun = "binomial", cytos = object, 
   mutate(pointlabs = ifelse(p.value < 0.1, term, NA)) %>%
 ggplot(aes(x = estimate, y = -log(p.value), label = pointlabs, color = term)) +
   geom_point() +
-  theme_bw() +
+  theme_bw() 
   labs(x = "Estimate", y = "-log(p-value)") +
   scale_color_discrete(name = "Cytokines", breaks = c("ALCAM.CD166", "C.Reactive.Protein.CRP", "CCL2.JE.MCP.1", "Complement.Component.C9", "Cystatin.C", "IL.1.beta.IL.1F2", "IL.10", "IL.12.IL.23.p40", "IL.6", "MMP.2", "S100A9", "TNF.alpha", "vWF.A2"), labels = c("CD166", "C-Reactive Protein", "CCL2/JE/MCP-1", "Complement Component C9", "Cystatin C", "IL-1 beta/IL-1F2", "IL-10", "IL-12/IL-23 p40", "IL-6", "MMP-2", "S100A9", "TNF alpha", "vWF-A2"))
+
 
 ggsave("../figures/cytokine_effect-size_volcano-plot.png")
 
