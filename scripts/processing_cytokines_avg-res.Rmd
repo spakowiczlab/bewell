@@ -92,7 +92,7 @@ res.tab2.box <-  res.tab2%>%
   filter(!grepl("Standard", Sample)) %>%
   gather(-Sample, -Location, -Total.Events, key = "cytokine", value = "result") %>%
   # filter(cytokine != "Cystatin.C") %>%
-  mutate(result = as.numeric(result)) %>%
+  mutate(result = as.numeric(gsub("> ", "", result))) %>%
   group_by(cytokine) %>%
   mutate(iqr = IQR(result, na.rm = T),
          is.outlier = (result > quantile(result,.75,na.rm = T ) + 1.5*iqr)|(result < quantile(result,.25,na.rm = T ) - 1.5*iqr)) %>%
@@ -209,7 +209,9 @@ res.good.4 <- res.tab4.box %>%
   anti_join(res.out.b4) %>%
   filter(!grepl("Background", Sample)) %>%
   group_by(Sample, cytokine) %>%
-  summarize(avg.res = mean(result, na.rm = T))
+  summarize(avg.res = mean(result, na.rm = T)) %>%
+  mutate(cytokine = gsub("Comlement", "Complement", cytokine),
+         avg.res = ifelse(is.nan(avg.res), 0, avg.res))
 
 avg.results.tab <- bind_rows(res.good.1, res.good.2, res.good.3, res.good.4)
 ```
