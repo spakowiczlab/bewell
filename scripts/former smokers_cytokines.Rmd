@@ -19,8 +19,8 @@ library(ggplot2)
 
 
 ```{r}
-cytokines <- read.csv("/Users/baileyconrad/Desktop/bewell/data/derived/cytokines_avg-results.csv", stringsAsFactors = F)
-samplabs <- read.csv("../data/derived/timepoint_key.csv")
+cytokines <- read.csv("/Users/baileyconrad/documents/GitHub/bewell/data/derived/cytokines_avg-results.csv")
+samplabs <- read.csv("/Users/baileyconrad/documents/GitHub/bewell/data/derived/timepoint_key.csv")
 demos <- read.csv("/Users/baileyconrad/Documents/BEWELL demographics.csv")
 ```
 
@@ -89,8 +89,7 @@ ggplot(aes(x = estimate, y = -log(p.value), label = pointlabs, color = term)) +
   theme_bw() +
   labs(x = "Estimate", y = "-log(p-value)") +
  scale_color_discrete(name = "Cytokines", breaks = c("ALCAM.CD166", "C.Reactive.Protein.CRP", "CCL2.JE.MCP.1", "Complement.Component.C9", "Cystatin.C", "IL.1.beta.IL.1F2", "IL.10", "IL.12.IL.23.p40", "IL.6", "MMP.2", "S100A9", "TNF.alpha", "vWF.A2"), labels = c("CD166", "C-Reactive Protein", "CCL2/JE/MCP-1", "Complement Component C9", "Cystatin C", "IL-1 beta/IL-1F2", "IL-10", "IL-12/IL-23 p40", "IL-6", "MMP-2", "S100A9", "TNF alpha", "vWF-A2")) +
-  xlim(-0.75, 0.75) +
-  ggtitle("Effect Size of Cytokines in Former Smokers")+
+  ggtitle("Effect Size of Cytokines in Former Smokers") +
   theme(plot.title = element_text(hjust = 0.5))
 
 ggsave("../figures/former_smokers_cytokine_effect-size_volcano-plot.png")
