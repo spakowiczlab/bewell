@@ -15,6 +15,7 @@ library(rlist)
 library(ggrepel)
 library(ggtext)
 library(ggplot2)
+library(ggpubr)
 ```
 
 
@@ -49,7 +50,7 @@ samplab.form <- combine %>%
   select(Sample, timepoint.label, Smoking.status) 
 
 
-cyto.form <- cytokines %>%
+cyto.form.former <- cytokines %>%
  select(-X) %>% pivot_wider(names_from = cytokine, values_from = avg.res) %>%
   mutate(Sample = gsub("^0", "", Sample), Sample = gsub("\\.1$", "", Sample)) %>%
   left_join(samplab.form) %>%
@@ -67,7 +68,7 @@ object <- c("ALCAM.CD166", "C.Reactive.Protein.CRP", "CCL2.JE.MCP.1", "Complemen
 #binomial and logistic regression
 #cytos: testing against outcome
 #modin: data frame with all the columns
-capture.models.univ <- function(outcome, lfun, cytos, modin) {
+capture.models.univ.former <- function(outcome, lfun, cytos, modin) {
   mods.list <- lapply(cytos, function(x)  try({glm(as.formula(paste0(outcome, " ~ ", x)), family = lfun, data = modin) %>% tidy()}))
   
 mods.list.clean <- list.clean(mods.list, function(x) is.null(x))
@@ -78,22 +79,73 @@ return(mods.df)
 
 
 ```{r warning=FALSE}
-capture.models.univ(outcome = "berry.group", lfun = "binomial", cytos = object, modin = cyto.form) %>%
+former <- capture.models.univ.former(outcome = "berry.group", lfun = "binomial", cytos = object, modin = cyto.form.former) %>%
+  
+  
   filter(p.value<1.0) %>%
   filter(term !="(Intercept)") %>%
-  mutate(term = fct_reorder(term, estimate)) %>%
-  mutate(pointlabs = ifelse(p.value < 1.0, term, NA)) %>%
+  # mutate(term = fct_reorder(term, estimate)) %>%
+  mutate(pointlabs = ifelse(-log(p.value) > 0.5, term, NA)) %>%
+  
+  
 ggplot(aes(x = estimate, y = -log(p.value), label = pointlabs, color = term)) +
   geom_point() +
   theme_bw() +
   labs(x = "Estimate", y = "-log(p-value)") +
- scale_color_discrete(name = "Cytokines", breaks = c("ALCAM.CD166", "C.Reactive.Protein.CRP", "CCL2.JE.MCP.1", "Complement.Component.C9", "Cystatin.C", "IL.1.beta.IL.1F2", "IL.10", "IL.12.IL.23.p40", "IL.6", "MMP.2", "S100A9", "TNF.alpha", "vWF.A2"), labels = c("CD166", "C-Reactive Protein", "CCL2/JE/MCP-1", "Complement Component C9", "Cystatin C", "IL-1 beta/IL-1F2", "IL-10", "IL-12/IL-23 p40", "IL-6", "MMP-2", "S100A9", "TNF alpha", "vWF-A2")) +
-  ggtitle("Effect Size of Cytokines in Former Smokers") +
-  theme(plot.title = element_text(hjust = 0.5))
-
-ggsave("../figures/former_smokers_cytokine_effect-size_volcano-plot.png")
+  theme(plot.title = element_text(hjust = 0.5)) +
+  geom_hline(yintercept = 0.5) +
+  geom_label_repel() +
+  theme(legend.position="none") +
+  ggtitle("Former Smokers") 
+          
+former
 
 ```
 
+```{r}
+cyto.form.current <- cytokines %>%
+ select(-X) %>% pivot_wider(names_from = cytokine, values_from = avg.res) %>%
+  mutate(Sample = gsub("^0", "", Sample), Sample = gsub("\\.1$", "", Sample)) %>%
+  left_join(samplab.form) %>%
+  mutate(berry.group = ifelse(grepl("postBRB",timepoint.label), 1, 0)) %>%
+  filter(Smoking.status=="current") 
+```
 
+```{r}
+object <- c("ALCAM.CD166", "C.Reactive.Protein.CRP", "CCL2.JE.MCP.1", "Complement.Component.C9", "Cystatin.C", "IL.1.beta.IL.1F2", "IL.10", "IL.12.IL.23.p40", "IL.6", "MMP.2", "S100A9", "TNF.alpha", "vWF.A2")
+
+capture.models.univ.current <- function(outcome, lfun, cytos, modin) {
+  mods.list <- lapply(cytos, function(x)  try({glm(as.formula(paste0(outcome, " ~ ", x)), family = lfun, data = modin) %>% tidy()}))
+  
+mods.list.clean <- list.clean(mods.list, function(x) is.null(x))
+mods.df <- bind_rows(mods.list.clean)
+return(mods.df)
+}
+```
+
+```{r}
+current <- capture.models.univ.current(outcome = "berry.group", lfun = "binomial", cytos = object, modin = cyto.form.current) %>%
+  filter(p.value<1.0) %>%
+  filter(term !="(Intercept)") %>%
+  mutate(pointlabs = ifelse(-log(p.value) > 0.5, term, NA)) %>%
+ggplot(aes(x = estimate, y = -log(p.value), label = pointlabs, color = term)) +
+  geom_point() +
+  theme_bw() +
+  labs(x = "Estimate", y = "-log(p-value)") +
+  ggtitle("Current Smokers") +
+  theme(plot.title = element_text(hjust = 0.5)) +
+  theme(legend.position="none") +
+  geom_hline(yintercept = 0.5) +
+  geom_label_repel()
+
+current
+```
+
+```{r}
+plot <- ggarrange(current, former)
+
+annotate_figure(plot, top = text_grob("Effect Size of Cytokines", size = 14)) 
+
+ggsave("/Users/baileyconrad/documents/GitHub/bewell/data/derived/cytokines_avg-results.csv")
+```
 
