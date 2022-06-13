@@ -128,15 +128,16 @@ current <- capture.models.univ.current(outcome = "berry.group", lfun = "binomial
   filter(p.value<1.0) %>%
   filter(term !="(Intercept)") %>%
   mutate(pointlabs = ifelse(-log(p.value) > 0.5, term, NA)) %>%
+  
 ggplot(aes(x = estimate, y = -log(p.value), label = pointlabs, color = term)) +
   geom_point() +
   theme_bw() +
   labs(x = "Estimate", y = "-log(p-value)") +
-  ggtitle("Current Smokers") +
   theme(plot.title = element_text(hjust = 0.5)) +
-  theme(legend.position="none") +
   geom_hline(yintercept = 0.5) +
-  geom_label_repel()
+  geom_label_repel() +
+  theme(legend.position="none") +
+  ggtitle("Current Smokers") 
 
 current
 ```
@@ -146,6 +147,6 @@ plot <- ggarrange(current, former)
 
 annotate_figure(plot, top = text_grob("Effect Size of Cytokines", size = 14)) 
 
-ggsave("/Users/baileyconrad/documents/GitHub/bewell/data/derived/cytokines_avg-results.csv")
+ggsave("/Users/baileyconrad/documents/GitHub/bewell/figures/by_smoking_status_cytokine_effect-size_volcano_plot.png")
 ```
 
