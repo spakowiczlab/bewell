@@ -23,9 +23,9 @@ library(plotly)
 
 
 ```{r}
-cytokines <- read.csv("/Users/baileyconrad/documents/GitHub/bewell/data/derived/cytokines_avg-results.csv")
-samplabs <- read.csv("/Users/baileyconrad/documents/GitHub/bewell/data/derived/timepoint_key.csv")
-demos <- read.csv("/Users/baileyconrad/Documents/BEWELL demographics.csv")
+cytokines <- read.csv("/Users/baileyconrad/Desktop/bewell/data/derived/cytokines_avg-results.csv")
+samplabs <- read.csv("/Users/baileyconrad/Desktop/bewell/data/derived/timepoint_key.csv")
+demos <- read.csv("/Users/baileyconrad/Desktop/bewell/data/derived/BEWELL demographics.csv")
 ```
 
 ```{r}
@@ -54,14 +54,6 @@ cyto.form <- cytokines %>%
   filter(Smoking.status=="former") %>%
   subset(select = -Sample) %>%
   mutate_at(vars(Cystatin.C), ~replace_na(.,mean(., na.rm = TRUE))) #this is setting the N/A values to the mean of that column
-
-
-# SCRATCH
-# names <- cyto.form$Sample
-# cyto.form <- cyto.form[,-1]
-# row.names(cyto.form) <- names
-  # subset(select = -Sample) %>%
-  # mutate_at(vars(ALCAM.CD166, CCL2.JE.MCP.1, Complement.Component.C9, Cystatin.C, IL.1.beta.IL.1F2, IL.10, IL.12.IL.23.p40, IL.6, MMP.2, S100A9, TNF.alpha, vWF.A2), ~replace_na(.,mean(., na.rm = TRUE))) #this is setting the N/A values to the mean of that column
 ```
 
 
@@ -92,7 +84,7 @@ autoplot(cyto.form.pca, data = cyto.form, columns = c("ALCAM.CD166", "C.Reactive
   scale_fill_discrete(breaks = c("postBRB", "postP", "preBRB", "preP"), labels = c("post-BRB", "post-placebo", "pre-BRB", "pre-placebo"))
 
 
-ggsave("/Users/baileyconrad/documents/GitHub/bewell/figures/pca_clustering_cytokines_by experimental groups.png")
+ggsave("/Users/baileyconrad/Desktop/bewell/figures/pca_clustering_cytokines_by experimental groups.png")
 ```
 
 
