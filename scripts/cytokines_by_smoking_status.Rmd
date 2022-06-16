@@ -1,5 +1,5 @@
 ---
-title: "former smokers_cytokines"
+title: "effect size plot-cytokines by smoking status"
 author: "Bailey Conrad"
 date: "`r Sys.Date()`"
 output: html_document
@@ -20,9 +20,9 @@ library(ggpubr)
 
 
 ```{r}
-cytokines <- read.csv("/Users/baileyconrad/documents/GitHub/bewell/data/derived/cytokines_avg-results.csv")
-samplabs <- read.csv("/Users/baileyconrad/documents/GitHub/bewell/data/derived/timepoint_key.csv")
-demos <- read.csv("/Users/baileyconrad/Documents/BEWELL demographics.csv")
+cytokines <- read.csv("/Users/baileyconrad/Desktop/bewell/data/derived/cytokines_avg-results.csv")
+samplabs <- read.csv("/Users/baileyconrad/Desktop/bewell/data/derived/timepoint_key.csv")
+demos <- read.csv("/Users/baileyconrad/Desktop/bewell/data/derived/BEWELL demographics.csv")
 ```
 
 Converting data into wide format from long format. 
@@ -128,7 +128,8 @@ current <- capture.models.univ.current(outcome = "berry.group", lfun = "binomial
   filter(p.value<1.0) %>%
   filter(term !="(Intercept)") %>%
   mutate(pointlabs = ifelse(-log(p.value) > 0.5, term, NA)) %>%
-  
+#log is log base 2--default in R
+    
 ggplot(aes(x = estimate, y = -log(p.value), label = pointlabs, color = term)) +
   geom_point() +
   theme_bw() +
@@ -147,6 +148,6 @@ plot <- ggarrange(current, former)
 
 annotate_figure(plot, top = text_grob("Effect Size of Cytokines", size = 14)) 
 
-ggsave("/Users/baileyconrad/documents/GitHub/bewell/figures/by_smoking_status_cytokine_effect-size_volcano_plot.png")
+ggsave("/Users/baileyconrad/Desktop/bewell/figures/by_smoking_status_cytokine_effect-size_volcano_plot.png")
 ```
 
