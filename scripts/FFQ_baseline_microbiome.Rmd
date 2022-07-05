@@ -117,6 +117,8 @@ ggplot(aes(x = estimate, y = -log(p.value), label = pointlabs, color = TaxaLevel
   # scale_x_log10() +
   # ylim(0, 5) 
 edip
+
+ggsave("/Users/baileyconrad/Desktop/bewell/figures/FFQ_microbiome_edip.png")
 ```
 
 #EDIH
@@ -154,6 +156,7 @@ ggplot(aes(x = estimate, y = -log(p.value), label = pointlabs, color = TaxaLevel
   scale_color_discrete(name = "Taxonomic Level", breaks = c("k", "p", "c", "o", "f", "g", "s"), labels = c("Kingdom", "Phylum", "Class", "Order", "Family", "Genus", "Species"))
 
 edih
+ggsave("/Users/baileyconrad/Desktop/bewell/figures/FFQ_microbiome_edih.png")
 ```
 
 #HEI
@@ -191,6 +194,7 @@ ggplot(aes(x = estimate, y = -log(p.value), label = pointlabs, color = TaxaLevel
   scale_color_discrete(name = "Taxonomic Level", breaks = c("k", "p", "c", "o", "f", "g", "s"), labels = c("Kingdom", "Phylum", "Class", "Order", "Family", "Genus", "Species"))
 
 hei
+ggsave("/Users/baileyconrad/Desktop/bewell/figures/FFQ_microbiome_hei.png")
 ```
 
 
