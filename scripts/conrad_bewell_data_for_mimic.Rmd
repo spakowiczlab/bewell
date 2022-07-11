@@ -151,7 +151,7 @@ all_mod_res %>%
 ggplot(aes(x = estimate, y = -log(p.value), label = pointlabs, color = TaxaLevel)) +
   ylim(0, 5) +
   geom_point() +
-  theme_bw() +
+  theme_bw(base_size = 18) +
   labs(x = "Estimate", y = "-log(p-value)") +
   geom_hline(yintercept = 2.0)+
   scale_x_log10() +
