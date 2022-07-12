@@ -16,6 +16,7 @@ library(ggrepel)
 library(ggtext)
 library(ggplot2)
 library(patchwork)
+library(ggpubr)
 ```
 
 ```{r}
@@ -155,20 +156,39 @@ all_mod_res_former <- lapply(all_tax_levs_former, format_and_model_former) %>%
 ```{r warning = FALSE}
 former <- all_mod_res_former %>%
   separate(term, into = c("TaxaLevel", "term"), sep = "__") %>%
+  mutate(TaxaLevel = if_else(grepl("k", TaxaLevel),
+                                   true = "Kingdom",
+                                   false = if_else(grepl("p", TaxaLevel),
+                                   true = "Phylum",
+                                   false = if_else(grepl("c", TaxaLevel),
+                                   true = "Class",
+                                   false = if_else(grepl("o", TaxaLevel),
+                                   true = "Order",
+                                   false = if_else(grepl("f", TaxaLevel),
+                                   true = "Family",
+                                   false = if_else(grepl("g", TaxaLevel),
+                                   true = "Genus",
+                                   false = if_else(grepl("s", TaxaLevel),
+                                   true = "Species",
+                                   false = TaxaLevel
+                                   )))))))) %>%
+  mutate(TaxaLevel = fct_relevel(TaxaLevel, c("Kingdom", "Phylum", "Class", "Order", "Family", "Genus", "Species"))) %>%
   mutate(pointlabs = ifelse(p.value < 0.105, term, NA)) %>%
   mutate(pointlabs = gsub("_", " ", pointlabs)) %>%
+  
 ggplot(aes(x = estimate, y = -log(p.value), label = pointlabs, color = TaxaLevel)) +
   ylim(0, 5) +
   geom_point() +
-  theme_bw() +
+  theme_bw(base_size = 18) +
   labs(x = "Estimate", y = "-log(p-value)") +
   geom_hline(yintercept = 2.0)+
   scale_x_log10() +
   geom_label_repel(show.legend=F) +
-  scale_color_discrete(name = "Taxonomic Level", breaks = c("k", "p", "c", "o", "f", "g", "s"), labels = c("Kingdom", "Phylum", "Class", "Order", "Family", "Genus", "Species"))+
+  # scale_color_discrete(name = "Taxonomic Level", breaks = c("k", "p", "c", "o", "f", "g", "s"), labels = c("Kingdom", "Phylum", "Class", "Order", "Family", "Genus", "Species"))+
   theme(legend.position="none")+
   ggtitle("Former Smokers") +
-  theme(plot.title = element_text(hjust = 0.5))
+  theme(plot.title = element_text(hjust = 0.5)) +
+  scale_color_viridis_d(option = "turbo", name = "Taxonomic Level")
 
 former
 ```
@@ -282,21 +302,38 @@ all_mod_res_current <- lapply(all_tax_levs_current, format_and_model_current) %>
 
 ```{r warning = FALSE}
 current <- all_mod_res_current %>%
-  separate(term, into = c("TaxaLevel", "term"), sep = "__") %>%
+ separate(term, into = c("TaxaLevel", "term"), sep = "__") %>%
+  mutate(TaxaLevel = if_else(grepl("k", TaxaLevel),
+                                   true = "Kingdom",
+                                   false = if_else(grepl("p", TaxaLevel),
+                                   true = "Phylum",
+                                   false = if_else(grepl("c", TaxaLevel),
+                                   true = "Class",
+                                   false = if_else(grepl("o", TaxaLevel),
+                                   true = "Order",
+                                   false = if_else(grepl("f", TaxaLevel),
+                                   true = "Family",
+                                   false = if_else(grepl("g", TaxaLevel),
+                                   true = "Genus",
+                                   false = if_else(grepl("s", TaxaLevel),
+                                   true = "Species",
+                                   false = TaxaLevel
+                                   )))))))) %>%
+  mutate(TaxaLevel = fct_relevel(TaxaLevel, c("Kingdom", "Phylum", "Class", "Order", "Family", "Genus", "Species"))) %>%
   mutate(pointlabs = ifelse(p.value < 0.105, term, NA)) %>%
   mutate(pointlabs = gsub("_", " ", pointlabs)) %>%
+  
 ggplot(aes(x = estimate, y = -log(p.value), label = pointlabs, color = TaxaLevel)) +
   ylim(0, 5) +
   geom_point() +
-  theme_bw() +
+  theme_bw(base_size = 18) +
   labs(x = "Estimate", y = "-log(p-value)") +
-  geom_hline(yintercept = 2.0)+
+  geom_hline(yintercept = 2.0) +
   scale_x_log10() +
   geom_label_repel(show.legend = F) +
-   scale_color_discrete(name = "Taxonomic Level", breaks = c("k", "p", "c", "o", "f", "g", "s"), labels = c("Kingdom", "Phylum", "Class", "Order", "Family", "Genus", "Species"))+
-   theme(legend.position="none") +
   ggtitle("Current Smokers") +
-  theme(plot.title = element_text(hjust = 0.5))
+  theme(plot.title = element_text(hjust = 0.5)) +
+  scale_color_viridis_d(option = "turbo", name = "Taxonomic Level")
 
 current
 ```
@@ -304,7 +341,11 @@ current
 ```{r warning = FALSE}
 ggp_all <- (former + current) %>%
   ggarrange(common.legend = TRUE, legend="bottom") +
-  scale_color_discrete(name = "Taxonomic Level", breaks = c("k", "p", "c", "o", "f", "g", "s"), labels = c("Kingdom", "Phylum", "Class", "Order", "Family", "Genus", "Species"))
+  # scale_color_discrete(name = "Taxonomic Level", breaks = c("k", "p", "c", "o", "f", "g", "s"), labels = c("Kingdom", "Phylum", "Class", "Order", "Family", "Genus", "Species")) +
+  ggtitle("Effect Size of Microbes")
+
+# annotate_figure(plot, top = text_grob("Effect Size of Microbes", size = 14)) 
+
 ggp_all
 
 ggsave("/Users/baileyconrad/Desktop/bewell/figures/by_smoking_status_microbes_effect-size_volcano_plot.png", width = 10, height = 6)
