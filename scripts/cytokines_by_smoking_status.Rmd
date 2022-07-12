@@ -1,5 +1,5 @@
 ---
-title: "effect size plot-cytokines by smoking status"
+title: "effect size plot-cytokines by smoking status side by side
 author: "Bailey Conrad"
 date: "`r Sys.Date()`"
 output: html_document
@@ -59,8 +59,8 @@ cyto.form.former <- cytokines %>%
 ```
 
 ```{r}
-object <- c("ALCAM.CD166", "C.Reactive.Protein.CRP", "CCL2.JE.MCP.1", "Complement.Component.C9", "Cystatin.C", "IL.1.beta.IL.1F2", "IL.10", "IL.12.IL.23.p40", "IL.6", "MMP.2", "S100A9", "TNF.alpha", "vWF.A2")
-# object <- unique(cytokines$cytokine): same thing as above 
+# object <- c("ALCAM.CD166", "C.Reactive.Protein.CRP", "CCL2.JE.MCP.1", "Complement.Component.C9", "Cystatin.C", "IL.1.beta.IL.1F2", "IL.10", "IL.12.IL.23.p40", "IL.6", "MMP.2", "S100A9", "TNF.alpha", "vWF.A2")
+object <- unique(cytokines$cytokine)
 
 #arguments: we want to make = to the variables; must be defined prior to function 
 #variable: object making in R that shows in environment
@@ -80,26 +80,23 @@ return(mods.df)
 
 ```{r warning=FALSE}
 former <- capture.models.univ.former(outcome = "berry.group", lfun = "binomial", cytos = object, modin = cyto.form.former) %>%
-  
-  
   filter(p.value<1.0) %>%
   filter(term !="(Intercept)") %>%
-  # mutate(term = fct_reorder(term, estimate)) %>%
   mutate(pointlabs = ifelse(-log(p.value) > 0.5, term, NA)) %>%
   
   
 ggplot(aes(x = estimate, y = -log(p.value), label = pointlabs, color = term)) +
   geom_point() +
-  theme_bw() +
+  theme_bw(base_size = 18) +
   labs(x = "Estimate", y = "-log(p-value)") +
   theme(plot.title = element_text(hjust = 0.5)) +
   geom_hline(yintercept = 0.5) +
   geom_label_repel() +
   theme(legend.position="none") +
-  ggtitle("Former Smokers") 
+  ggtitle("Former Smokers") +
+  scale_color_viridis_d(option = "turbo")
           
 former
-
 ```
 
 ```{r}
@@ -113,6 +110,7 @@ cyto.form.current <- cytokines %>%
 
 ```{r}
 object <- c("ALCAM.CD166", "C.Reactive.Protein.CRP", "CCL2.JE.MCP.1", "Complement.Component.C9", "Cystatin.C", "IL.1.beta.IL.1F2", "IL.10", "IL.12.IL.23.p40", "IL.6", "MMP.2", "S100A9", "TNF.alpha", "vWF.A2")
+#object <- unique(cytokines$cytokine)
 
 capture.models.univ.current <- function(outcome, lfun, cytos, modin) {
   mods.list <- lapply(cytos, function(x)  try({glm(as.formula(paste0(outcome, " ~ ", x)), family = lfun, data = modin) %>% tidy()}))
@@ -132,13 +130,14 @@ current <- capture.models.univ.current(outcome = "berry.group", lfun = "binomial
     
 ggplot(aes(x = estimate, y = -log(p.value), label = pointlabs, color = term)) +
   geom_point() +
-  theme_bw() +
+  theme_bw(base_size = 18) +
   labs(x = "Estimate", y = "-log(p-value)") +
   theme(plot.title = element_text(hjust = 0.5)) +
   geom_hline(yintercept = 0.5) +
   geom_label_repel() +
   theme(legend.position="none") +
-  ggtitle("Current Smokers") 
+  ggtitle("Current Smokers") +
+  scale_color_viridis_d(option = "turbo")
 
 current
 ```
@@ -146,8 +145,9 @@ current
 ```{r}
 plot <- ggarrange(current, former)
 
-annotate_figure(plot, top = text_grob("Effect Size of Cytokines", size = 14)) 
+annotate_figure(plot, top = text_grob("Effect Size of Cytokines", size = 18)) 
 
 ggsave("/Users/baileyconrad/Desktop/bewell/figures/by_smoking_status_cytokine_effect-size_volcano_plot.png")
 ```
+
 
