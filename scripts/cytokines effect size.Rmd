@@ -71,7 +71,7 @@ plot <- capture.models.univ(outcome = "berry.group", lfun = "binomial", cytos = 
   
 ggplot(aes(x = estimate, y = -log(p.value), label = pointlabs, color = term)) +
   geom_point() +
-  theme_bw() +
+  theme_bw(base_size = 18) +
   labs(x = "Estimate", y = "-log(p-value)") 
 
 
@@ -82,8 +82,9 @@ plot +
   geom_label_repel() +
   geom_hline(yintercept = 0.5) +
   theme(legend.position="none") +
-  ggtitle("Effect Size of Cytokines in Current and Former Smokers") +
-  theme(plot.title = element_text(hjust = 0.5))
+  # ggtitle("Effect Size of Cytokines in Current and Former Smokers") +
+  # theme(plot.title = element_text(hjust = 0.5)) +
+  scale_color_viridis_d(option = "turbo")
 
 ggsave("../figures/cytokine_effect-size_volcano-plot.png")
 ```
@@ -102,5 +103,6 @@ ggsave("../figures/cytokine_effect-size_volcano-plot.png")
 #   theme(axis.text.y = element_markdown())
 # ggsave("../figures/effect-size_cytokines.png")
 ```
+
 
 
