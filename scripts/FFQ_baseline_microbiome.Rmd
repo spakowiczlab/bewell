@@ -25,26 +25,26 @@ ord <- read.csv("/Users/baileyconrad/Desktop/bewell/data/derived/RelAbun/RelAbun
 fam <- read.csv("/Users/baileyconrad/Desktop/bewell/data/derived/RelAbun/RelAbun_fam.csv")
 gen <- read.csv("/Users/baileyconrad/Desktop/bewell/data/derived/RelAbun/RelAbun_gen.csv")
 spec <- read.csv("/Users/baileyconrad/Desktop/bewell/data/derived/RelAbun/RelAbun_spec.csv")
-FFQ <- read.csv("/Users/baileyconrad/Desktop/bewell/data/derived/bewell.edihedipscores.csv")
+FFQ <- read.csv("/Users/baileyconrad/Desktop/bewell/data/derived/bewelldietscore.07122022.csv")
 samplabs <- read.csv("/Users/baileyconrad/Desktop/bewell/data/derived/timepoint_key.csv")
 ```
 
 #Mutate data frame to 3 FFQ scores
 ```{r}
 FFQ.clean <- FFQ %>%
-  select(Username, edip, edih, HEI2015Score)
+  select(Username, resinversedih, resinversedip, RES_HEI2015)
 
 names(FFQ.clean)[names(FFQ.clean) == 'Username'] <- 'Subject.ID'
 ```
 
 #Wanting to see correlation between 3 FFQ scores
 ```{r}
-FFQ_corr <- cor(FFQ.clean[, c('edip','edih','HEI2015Score')])
+FFQ_corr <- cor(FFQ.clean[, c('resinversedih', 'resinversedip', 'RES_HEI2015')])
 
 FFQ_corr
-#EDIP: Empirical Dietary Inflammatory Pattern, lower means more anti-inflammatory diets
-#EDIH: Empirical Dietary Index for Hyperinsulinemia, lower scores indicating lower insulinemic diets
-#HEI: healthy eating index, higher score means better diet quality 
+#inverse EDIP: Empirical Dietary Inflammatory Pattern, inverted scores adjusted for total energy uptake, higher scores indicate anti-inflammatory
+#EDIH: Empirical Dietary Index for Hyperinsulinemia, inverted scores adjusted for total energy uptake, higher scores indicating lower insulinemic diets
+#HEI: healthy eating index, adjusted for total energy uptake, higher score means better diet quality 
 ```
 
 #Filtering to just visit 1 and merging with FFQ
@@ -53,7 +53,7 @@ samplab.form <- samplabs %>%
   pivot_longer(names_to = "Timepoint", values_to = "timepoints", cols = c("rP", "tP", "rB", "tB")) %>%
   mutate(Sample = paste0(Subject.Number, "-", Timepoint)) 
 
-samplab.v1 <- read.csv("/Users/baileyconrad/Desktop/bewell/data/derived/samplab.form.csv") %>%
+samplab.v1 <- read.csv("/Users/baileyconrad/Desktop/samplab.form.csv") %>%
   select(Sample, Subject.ID) 
 
 samplab.FFQ <- merge(samplab.v1,FFQ.clean,by="Subject.ID") %>%
@@ -76,8 +76,8 @@ all_tax_levs_long <- all_tax_levs %>%
 #Combining FFQ and Taxa data
 ```{r}
 atl_edip <- merge(samplab.FFQ,all_tax_levs,by="Sample") %>%
-  select(-edih) %>%
-  select(-HEI2015Score)
+  select(-resinversedih) %>%
+  select(-RES_HEI2015)
 
 object <- unique(all_tax_levs_long$Microbe)
 ```
@@ -94,13 +94,13 @@ return(mods.df)
 ```
 
 ```{r warning = FALSE}
-edip<-capture.models.univ.edip(outcome = "edip", lfun = "gaussian", mics = object, modin = atl_edip) %>%
+edip<-capture.models.univ.edip(outcome = "resinversedip", lfun = "gaussian", mics = object, modin = atl_edip) %>%
   filter(p.value<1.0) %>%
   filter(term !="(Intercept)") %>%
   separate(term, into = c("TaxaLevel", "term"), sep = "__") %>%
   mutate(term = gsub("_", " ", term)) %>%
-  mutate(pointlabs = ifelse(p.value <= 0.1, term, NA)) %>%
-ggplot(aes(x = estimate, y = -log(p.value), label = pointlabs, color = TaxaLevel)) +
+  mutate(pointlabs_edip = ifelse(p.value <= 0.05, term, NA)) %>%
+ggplot(aes(x = estimate, y = -log(p.value), label = pointlabs_edip, color = TaxaLevel)) +
   geom_point() +
   theme_bw() +
   labs(x = "Estimate", y = "-log(p-value)") +
@@ -126,8 +126,8 @@ ggsave("/Users/baileyconrad/Desktop/bewell/figures/FFQ_microbiome_edip.png")
 #Combining FFQ and Taxa data
 ```{r}
 atl_edih <- merge(samplab.FFQ,all_tax_levs,by="Sample") %>%
-  select(-edip) %>%
-  select(-HEI2015Score)
+  select(-resinversedip) %>%
+  select(-RES_HEI2015)
 ```
 
 #Gaussian generalized linear model
@@ -142,13 +142,13 @@ return(mods.df)
 ```
 
 ```{r warning = FALSE}
-edih<-capture.models.univ.edih(outcome = "edih", lfun = "gaussian", mics = object, modin = atl_edih) %>%
+edih<-capture.models.univ.edih(outcome = "resinversedih", lfun = "gaussian", mics = object, modin = atl_edih) %>%
   filter(p.value<1.0) %>%
   filter(term !="(Intercept)") %>%
   separate(term, into = c("TaxaLevel", "term"), sep = "__") %>%
   mutate(term = gsub("_", " ", term)) %>%
-  mutate(pointlabs = ifelse(p.value <= 0.1, term, NA)) %>%
-ggplot(aes(x = estimate, y = -log(p.value), label = pointlabs, color = TaxaLevel)) +
+  mutate(pointlabs_edih = ifelse(p.value <= 0.05, term, NA)) %>%
+ggplot(aes(x = estimate, y = -log(p.value), label = pointlabs_edih, color = TaxaLevel)) +
   geom_point() +
   theme_bw() +
   labs(x = "Estimate", y = "-log(p-value)") +
@@ -164,8 +164,8 @@ ggsave("/Users/baileyconrad/Desktop/bewell/figures/FFQ_microbiome_edih.png")
 #Combining FFQ and Taxa data
 ```{r}
 atl_HEI <- merge(samplab.FFQ,all_tax_levs,by="Sample") %>%
-  select(-edip) %>%
-  select(-edih)
+  select(-resinversedih) %>%
+  select(-resinversedip)
 ```
 
 #Gaussian generalized linear model
@@ -180,12 +180,12 @@ return(mods.df)
 ```
 
 ```{r warning = FALSE}
-hei<-capture.models.univ.hei(outcome = "HEI2015Score", lfun = "gaussian", mics = object, modin = atl_HEI) %>%
+hei<-capture.models.univ.hei(outcome = "RES_HEI2015", lfun = "gaussian", mics = object, modin = atl_HEI) %>%
   filter(p.value<1.0) %>%
   filter(term !="(Intercept)") %>%
   separate(term, into = c("TaxaLevel", "term"), sep = "__") %>%
   mutate(term = gsub("_", " ", term)) %>%
-  mutate(pointlabs = ifelse(p.value <= 0.1, term, NA)) %>%
+  mutate(pointlabs = ifelse(p.value <= 0.05, term, NA)) %>%
 ggplot(aes(x = estimate, y = -log(p.value), label = pointlabs, color = TaxaLevel)) +
   geom_point() +
   theme_bw() +
