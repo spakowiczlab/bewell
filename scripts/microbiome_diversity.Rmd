@@ -23,6 +23,7 @@ fam <- read.csv("/Users/baileyconrad/Desktop/bewell/data/derived/RelAbun/RelAbun
 gen <- read.csv("/Users/baileyconrad/Desktop/bewell/data/derived/RelAbun/RelAbun_gen.csv")
 spec <- read.csv("/Users/baileyconrad/Desktop/bewell/data/derived/RelAbun/RelAbun_spec.csv")
 samplabs <- read.csv("/Users/baileyconrad/Desktop/bewell/data/derived/timepoint_key.csv")
+demos <- read.csv("/Users/baileyconrad/Desktop/bewell/data/derived/BEWELL demographics.csv")
 ```
 
 #Combine Data
@@ -32,7 +33,7 @@ combine_taxa <- list(king, phyl, class, ord, fam, gen, spec) %>%
   column_to_rownames(var = "X")
 
 samplab.form <- samplabs %>%
-  select(Subject.Number, placebo) %>%
+  select(Subject.Number, Subject.ID, placebo) %>%
   mutate(rP = ifelse(placebo == "Week 0", 1, 3),
         tP = ifelse(placebo == "Week 0", 2, 4),
         rB = ifelse(placebo == "Week 0", 3, 1),
@@ -92,3 +93,113 @@ SR_plot <- merge(samplab.form, SR, by = "Sample") %>%
 
 SR_plot
 ```
+
+#Now, same thing but stratified by smoking status
+
+#Former
+```{r}
+demos_former <- merge(samplab.form,demos,by="Subject.ID") %>%
+  filter(Smoking.status=="former") 
+```
+
+```{r}
+f_shan_plot <- merge(demos_former, shan, by = "Sample") %>%
+  ggplot()  +
+  geom_boxplot(aes(x = timepoints, y = shannon, group = timepoints)) +
+  ggtitle("Shannon - Former Smokers")
+
+f_shan_plot
+```
+
+```{r}
+f_simp_plot <- merge(demos_former, simp, by = "Sample") %>%
+  ggplot()  +
+  geom_boxplot(aes(x = timepoints, y = simpson, group = timepoints)) +
+  ggtitle("Simpson - Former Smokers")
+
+f_simp_plot
+```
+
+```{r}
+f_invsimp_plot <- merge(demos_former, invsimp, by = "Sample") %>%
+  ggplot()  +
+  geom_boxplot(aes(x = timepoints, y = invsimpson, group = timepoints)) +
+  ggtitle("Inverse Simpson - Former Smokers")
+
+f_invsimp_plot
+```
+
+```{r}
+f_SR_plot <- merge(demos_former, SR, by = "Sample") %>%
+  ggplot()  +
+  geom_boxplot(aes(x = timepoints, y = richness, group = timepoints)) +
+  ggtitle("Richness - Former Smokers")
+
+f_SR_plot
+```
+#Current
+```{r}
+demos_current <- merge(samplab.form,demos,by="Subject.ID") %>%
+  filter(Smoking.status=="current") 
+```
+
+```{r}
+c_shan_plot <- merge(demos_current, shan, by = "Sample") %>%
+  ggplot()  +
+  geom_boxplot(aes(x = timepoints, y = shannon, group = timepoints)) +
+  ggtitle("Shannon - Current Smokers")
+
+c_shan_plot
+```
+
+```{r}
+c_simp_plot <- merge(demos_current, simp, by = "Sample") %>%
+  ggplot()  +
+  geom_boxplot(aes(x = timepoints, y = simpson, group = timepoints)) +
+  ggtitle("Simpson - Current Smokers")
+
+c_simp_plot
+```
+
+```{r}
+c_invsimp_plot <- merge(demos_current, invsimp, by = "Sample") %>%
+  ggplot()  +
+  geom_boxplot(aes(x = timepoints, y = invsimpson, group = timepoints)) +
+  ggtitle("Inverse Simpson - Current Smokers")
+
+c_invsimp_plot
+```
+
+```{r}
+c_SR_plot <- merge(demos_current, SR, by = "Sample") %>%
+  ggplot()  +
+  geom_boxplot(aes(x = timepoints, y = richness, group = timepoints)) +
+  ggtitle("Richness - Current Smokers")
+
+c_SR_plot
+```
+
+```{r}
+smoking_shannon <- ggarrange(c_shan_plot, f_shan_plot)
+
+smoking_shannon
+```
+
+```{r}
+smoking_simpson <- ggarrange(c_simp_plot, f_simp_plot)
+
+smoking_simpson
+```
+
+```{r}
+smoking_invsimpson <- ggarrange(c_invsimp_plot, f_invsimp_plot)
+
+smoking_invsimpson
+```
+
+```{r}
+smoking_richness <- ggarrange(c_SR_plot, f_SR_plot)
+
+smoking_richness
+```
+
