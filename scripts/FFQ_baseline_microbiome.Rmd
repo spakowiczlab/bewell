@@ -53,8 +53,11 @@ samplab.form <- samplabs %>%
   pivot_longer(names_to = "Timepoint", values_to = "timepoints", cols = c("rP", "tP", "rB", "tB")) %>%
   mutate(Sample = paste0(Subject.Number, "-", Timepoint)) 
 
+
 samplab.v1 <- read.csv("/Users/baileyconrad/Desktop/samplab.form.csv") %>%
-  select(Sample, Subject.ID) 
+  select(Sample, Subject.ID)
+
+write.csv(samplab.v1, "/Users/baileyconrad/Desktop/bewell/data/derived/samplab.form.v1.csv")
 
 samplab.FFQ <- merge(samplab.v1,FFQ.clean,by="Subject.ID") %>%
   select(-Subject.ID) 
@@ -105,7 +108,8 @@ ggplot(aes(x = estimate, y = -log(p.value), label = pointlabs_edip, color = Taxa
   theme_bw() +
   labs(x = "Estimate", y = "-log(p-value)") +
   geom_label_repel(show.legend = F) +
-  scale_color_discrete(name = "Taxonomic Level", breaks = c("k", "p", "c", "o", "f", "g", "s"), labels = c("Kingdom", "Phylum", "Class", "Order", "Family", "Genus", "Species"))
+  scale_color_discrete(name = "Taxonomic Level", breaks = c("k", "p", "c", "o", "f", "g", "s"), labels = c("Kingdom", "Phylum", "Class", "Order", "Family", "Genus", "Species")) +
+  ggtitle("EDIP")
 
 
   # separate(term, into = c("TaxaLevel", "term"), sep = "__") %>%
@@ -153,7 +157,8 @@ ggplot(aes(x = estimate, y = -log(p.value), label = pointlabs_edih, color = Taxa
   theme_bw() +
   labs(x = "Estimate", y = "-log(p-value)") +
   geom_label_repel(show.legend = F) +
-  scale_color_discrete(name = "Taxonomic Level", breaks = c("k", "p", "c", "o", "f", "g", "s"), labels = c("Kingdom", "Phylum", "Class", "Order", "Family", "Genus", "Species"))
+  scale_color_discrete(name = "Taxonomic Level", breaks = c("k", "p", "c", "o", "f", "g", "s"), labels = c("Kingdom", "Phylum", "Class", "Order", "Family", "Genus", "Species"))+
+  ggtitle("EDIH")
 
 edih
 ggsave("/Users/baileyconrad/Desktop/bewell/figures/FFQ_microbiome_edih.png")
@@ -191,7 +196,8 @@ ggplot(aes(x = estimate, y = -log(p.value), label = pointlabs, color = TaxaLevel
   theme_bw() +
   labs(x = "Estimate", y = "-log(p-value)") +
   geom_label_repel(show.legend = F) +
-  scale_color_discrete(name = "Taxonomic Level", breaks = c("k", "p", "c", "o", "f", "g", "s"), labels = c("Kingdom", "Phylum", "Class", "Order", "Family", "Genus", "Species"))
+  scale_color_discrete(name = "Taxonomic Level", breaks = c("k", "p", "c", "o", "f", "g", "s"), labels = c("Kingdom", "Phylum", "Class", "Order", "Family", "Genus", "Species")) +
+  ggtitle("HEI")
 
 hei
 ggsave("/Users/baileyconrad/Desktop/bewell/figures/FFQ_microbiome_hei.png")
