@@ -89,17 +89,39 @@ ggsave("../figures/effect-size_logistical-regression.png")
 ```{r warning=FALSE}
 all_mod_res %>%
   separate(term, into = c("TaxaLevel", "term"), sep = "__") %>%
+  mutate(TaxaLevel = if_else(grepl("k", TaxaLevel),
+                                   true = "Kingdom",
+                                   false = if_else(grepl("p", TaxaLevel),
+                                   true = "Phylum",
+                                   false = if_else(grepl("c", TaxaLevel),
+                                   true = "Class",
+                                   false = if_else(grepl("o", TaxaLevel),
+                                   true = "Order",
+                                   false = if_else(grepl("f", TaxaLevel),
+                                   true = "Family",
+                                   false = if_else(grepl("g", TaxaLevel),
+                                   true = "Genus",
+                                   false = if_else(grepl("s", TaxaLevel),
+                                   true = "Species",
+                                   false = TaxaLevel
+                                   )))))))) %>%
+  mutate(TaxaLevel = fct_relevel(TaxaLevel, c("Kingdom", "Phylum", "Class", "Order", "Family", "Genus", "Species"))) %>%
   mutate(pointlabs = ifelse(p.value < 0.105, term, NA)) %>%
   mutate(pointlabs = gsub("_", " ", pointlabs)) %>%
+  # separate(term, into = c("TaxaLevel", "term"), sep = "__") %>%
+  # mutate(pointlabs = ifelse(p.value < 0.105, term, NA)) %>%
+  # mutate(pointlabs = gsub("_", " ", pointlabs)) %>%
 ggplot(aes(x = estimate, y = -log(p.value), label = pointlabs, color = TaxaLevel)) +
   ylim(0, 5) +
   geom_point() +
-  theme_bw() +
+  theme_bw(base_size = 18) +
   labs(x = "Estimate", y = "-log(p-value)") +
   geom_hline(yintercept = 2.0)+
   scale_x_log10() +
   geom_label_repel(show.legend = F) +
-  scale_color_discrete(name = "Taxonomic Level", breaks = c("k", "p", "c", "o", "f", "g", "s"), labels = c("Kingdom", "Phylum", "Class", "Order", "Family", "Genus", "Species"))
+  scale_color_viridis_d(option = "turbo", name = "Taxonomic Level") 
+
+ 
 
 ggsave("../figures/effect-size_volcano-plot.png")
 
@@ -156,7 +178,7 @@ ggplot(aes(x = estimate, y = -log(p.value), label = pointlabs, color = TaxaLevel
   geom_hline(yintercept = 2.0)+
   scale_x_log10() +
   geom_label_repel(show.legend = F) +
-  scale_color_viridis_d(option = "turbo")
+  scale_color_viridis_d(option = "turbo", name = "Taxonomic Level")
 
 ggsave("../figures/ACC22_effect-size_volcano-plot.png",
        height = 4, width = 7)
