@@ -38,7 +38,7 @@ samplab.form <- samplabs %>%
         tP = ifelse(placebo == "Week 0", 2, 4),
         rB = ifelse(placebo == "Week 0", 3, 1),
         tB = ifelse(placebo == "Week 0", 4, 2)) %>%
-  pivot_longer(names_to = "Timepoint", values_to = "timepoints", cols = c("rP", "tP", "rB", "tB")) %>%
+  pivot_longer(names_to = "Timepoint", values_to = "timepoints", cols = c("rP", "tP", "rB", "tB"))%>%
   mutate(Sample = paste0(Subject.Number, "-", Timepoint))
 ```
 
