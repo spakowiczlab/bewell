@@ -203,3 +203,11 @@ smoking_richness <- ggarrange(c_SR_plot, f_SR_plot)
 smoking_richness
 ```
 
+```{r}
+diversity_indices <- list(shan, simp, SR, invsimp) %>%
+  reduce(full_join, by='Sample') %>%
+  column_to_rownames(var = "Sample")
+
+write.csv(diversity_indices, "/Users/baileyconrad/Desktop/bewell/data/derived/diversity_indices.csv")
+```
+
