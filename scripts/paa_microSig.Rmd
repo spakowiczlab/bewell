@@ -151,8 +151,8 @@ paa_gen_down <- c("g__Alistipes", "g__Fusobacterium", "g__Leuconostoc", "g__Paen
 ```
 
 ```{r}
-fitnessGen <- getMicroSigScore(paa_up, paa_down, f_taxa) 
-bewellGen <- getMicroSigScore(paa_up, paa_down, b_taxa)
+fitnessGen <- getMicroSigScore(paa_gen_up, paa_gen_down, f_taxa) 
+bewellGen <- getMicroSigScore(paa_gen_up, paa_gen_down, b_taxa)
 ```
 
 
@@ -231,6 +231,8 @@ bewellGen <- merge(blog_gen, bewellGen) %>%
   rename("scoreGenus" = "score") 
 
 bewell <- merge(bewell, bewellGen)
+
+bewell <- merge(bewell, blog)
 
 bewell <- bewell %>%
     select(sample, project, paaScore, paaBin, scoreGenus, paaBinGenus)
