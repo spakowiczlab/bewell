@@ -11,9 +11,8 @@ knitr::opts_chunk$set(echo = TRUE)
 library(tidyverse)
 ```
 
-```{r cars}
-#x <- read_csv("../data/derived/bewell_akkermansia.csv")
-x <- read_csv("/fs/ess/PAS1695/projects/bewell/data/bewell_akkermansia.csv")
+```{r data}
+x <- read_csv("../data/derived/bewell_akkermansia.csv")
 ```
 ```{r}
 y <- 
@@ -61,6 +60,38 @@ y %>%
   arrange(-rel.abun) %>%
   filter(treatment == "BRB")
 
+```
+
+```{r}
+x %>%
+  filter(Subject.ID == "HONC60-62") %>%
+  gather(-Subject.ID, key = "study_visit", value = "relAbun") %>%
+  mutate(study_visit = fct_relevel(study_visit, c("rP", "tP", "rB", "tB"))) %>%
+  ggplot(aes(x = study_visit, y = relAbun)) +
+  geom_bar(stat = "identity", aes(fill = study_visit), show.legend = FALSE) +
+  scale_fill_viridis_d() +
+  theme_bw() +
+  labs(x = "",
+       y = "Akkermansia Relative Abundance")
+
+ggsave("../figures/Akk_abundance_62.png",
+       height = 3, width = 4)
+```
+
+```{r}
+x %>%
+  gather(-Subject.ID, key = "study_visit", value = "relAbun") %>%
+  mutate(study_visit = fct_relevel(study_visit, c("rP", "tP", "rB", "tB"))) %>%
+  ggplot(aes(x = study_visit, y = relAbun)) +
+  geom_bar(stat = "identity", aes(fill = study_visit), show.legend = FALSE) +
+  scale_fill_viridis_d() +
+  theme_bw() +
+  labs(x = "",
+       y = "Akkermansia Relative Abundance") +
+  facet_wrap(~Subject.ID, scales = "free")
+
+ggsave("../figures/Akk_abundance_bar_all.png",
+       height = 7.5, width = 10)
 ```
 
 

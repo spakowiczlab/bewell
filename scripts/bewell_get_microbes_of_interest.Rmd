@@ -14,13 +14,13 @@ library(reshape2)
 
 read in data w/o row names
 ```{r}
-king <- read.csv("/fs/ess/PAS1695/projects/bewell/data/RelAbun/RelAbun_king.csv", row.names = 1)
-phyl <- read.csv("/fs/ess/PAS1695/projects/bewell/data/RelAbun/RelAbun_phyl.csv",row.names = 1)
-class <- read.csv("/fs/ess/PAS1695/projects/bewell/data/RelAbun/RelAbun_class.csv",row.names = 1)
-ord <- read.csv("/fs/ess/PAS1695/projects/bewell/data/RelAbun/RelAbun_ord.csv", row.names = 1)
-fam <- read.csv("/fs/ess/PAS1695/projects/bewell/data/RelAbun/RelAbun_fam.csv", row.names = 1)
-gen <- read.csv("/fs/ess/PAS1695/projects/bewell/data/RelAbun/RelAbun_gen.csv", row.names = 1)
-spec <- read.csv("/fs/ess/PAS1695/projects/bewell/data/RelAbun/RelAbun_spec.csv", row.names = 1)
+king <- read.csv("../data/derived/RelAbun/RelAbun_king.csv", row.names = 1)
+phyl <- read.csv("../data/derived/RelAbun/RelAbun_phyl.csv",row.names = 1)
+class <- read.csv("../data/derived/RelAbun/RelAbun_class.csv",row.names = 1)
+ord <- read.csv("../data/derived/RelAbun/RelAbun_ord.csv", row.names = 1)
+fam <- read.csv("../data/derived/RelAbun/RelAbun_fam.csv", row.names = 1)
+gen <- read.csv("../data/derived/RelAbun/RelAbun_gen.csv", row.names = 1)
+spec <- read.csv("../data/derived/RelAbun/RelAbun_spec.csv", row.names = 1)
 ```
 
 function to run wilcox test on pre/post BRB and return table of p-values
@@ -155,3 +155,73 @@ bp
 
 ggsave(filename = "../figures/aacr22_microbiomeBP.png", plot = bp, width = 12, height = 5.5, dpi = 300)
 ```
+
+Summarize all microbes for visualization
+```{r}
+aml <- allMics %>%
+  rownames_to_column("id") %>%
+  separate("id", into = c("ptid", "study_visit")) %>%
+  gather(-ptid, -study_visit, key = "microbe", value = "relAbun") %>%
+  mutate(study_visit = fct_relevel(study_visit, c("rP", "tP", "rB", "tB"))) %>%
+  mutate(relAbun = as.numeric(relAbun))
+
+
+```
+
+```{r}
+aml %>%
+  filter(microbe == "s__Lachnospira_pectinoschiza") %>%
+  ggplot(aes(x = study_visit, y = relAbun)) +
+  geom_bar(stat = "identity", aes(fill = study_visit), show.legend = FALSE) +
+  scale_fill_viridis_d() +
+  theme_bw() +
+  labs(x = "",
+       y = "Relative Abundance",
+       subtitle = "Lachnospira pectinoschiza") +
+  facet_wrap(~ptid)
+
+ggsave("../figures/Lachnospira_pectinoschiza_abundance_bar_all.png",
+       height = 7.5, width = 10)
+```
+
+```{r}
+aml %>%
+  filter(microbe == "s__Blautia_obeum") %>%
+  ggplot(aes(x = study_visit, y = relAbun)) +
+  geom_bar(stat = "identity", aes(fill = study_visit), show.legend = FALSE) +
+  scale_fill_viridis_d() +
+  theme_bw() +
+  labs(x = "",
+       y = "Relative Abundance",
+       subtitle = "Blautia obeum") +
+  facet_wrap(~ptid)
+
+ggsave("../figures/Blautia_obeum_abundance_bar_all.png",
+       height = 7.5, width = 10)
+```
+
+s__Roseburia_sp_CAG_309
+
+```{r}
+plotMicrobe <- function(df, name){
+  p <- 
+    df %>%
+    filter(microbe == name) %>%
+    ggplot(aes(x = study_visit, y = relAbun)) +
+    geom_bar(stat = "identity", aes(fill = study_visit), show.legend = FALSE) +
+    scale_fill_viridis_d() +
+    theme_bw() +
+    labs(x = "",
+         y = "Relative Abundance",
+         subtitle = name) +
+    facet_wrap(~ptid)
+  p
+
+ggsave(paste0("../figures/", name, "_abundance_bar_all.png"),
+       height = 7.5, width = 10)
+  
+}
+
+plotMicrobe(aml, "s__Roseburia_sp_CAG_309")
+```
+
