@@ -1,6 +1,6 @@
 ---
-title: "Untitled"
-author: "LN"
+title: "Urine metabolomics EDA"
+author: "Lane Nevers"
 date: "2023-06-12"
 output: html_document
 ---
@@ -36,7 +36,7 @@ metadata16 <- read_excel("../data/raw/urine-metabolomics/Dan Urine Anthocyanin 1
 metadata17 <- read_excel("../data/raw/urine-metabolomics/Dan Urine Anthocyanin 11-10-2022.xlsx", sheet = "concentration ng mL")
 metadata18 <- read_excel("../data/raw/urine-metabolomics/Dan Urine Anthocyanin 11-10-2022.xlsx", sheet = "concentration ng mL")
 metadata19 <- read_excel("../data/raw/urine-metabolomics/Dan Urine Anthocyanin 11-10-2022.xlsx", sheet = "concentration ng mL")
-timepoint.key <- read_csv("~/bewell/data/derived/timepoint_key_long.csv")
+timepoint.key <- read_csv("../data/derived/timepoint_key_long.csv")
 ```
 
 testing how to best manipulate data
