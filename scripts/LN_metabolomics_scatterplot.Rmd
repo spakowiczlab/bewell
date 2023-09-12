@@ -198,7 +198,7 @@ if (length(non_numeric_values) > 0) {
 avg_data <- merged.meta6.tpk %>%
   group_by(timepoint_meaning) %>%
   summarize(avg_value = mean(ng.mL, na.rm = TRUE))
-View(avg_data)
+
 ggplot(merged.meta6.tpk, aes(x = factor(timepoint_meaning, levels = c("Pre-placebo", "Post-placebo", "Pre-BRB", "Post-BRB")) , y = ng.mL)) +
   geom_boxplot() +
   labs(x = "Timepoint Meaning")
