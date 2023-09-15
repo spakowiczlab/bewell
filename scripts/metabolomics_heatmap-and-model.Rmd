@@ -9,6 +9,9 @@ knitr::opts_chunk$set(echo = TRUE)
 
 library(tidyverse)
 library(readxl)
+library(rlist)
+library(glmm)
+library(broom)
 ```
 
 # Load data
@@ -83,6 +86,17 @@ hmap.colord <- metabs.heatin %>%
 hmap.colord.ext <- hmap.colord$labels[hmap.colord$order]
 ```
 
+```{r modelling input}
+# earlysamps <- timepoint.key %>%
+#   filter(placebo == "Week 6")
+moddat <- metabs.l %>%
+  filter(
+    Subject.ID %in% earlysamps$Subject.ID &
+           Timepoint %in% c("rB", "tB")) %>%
+  pivot_wider(names_from = metab.id, values_from = ng.ml) %>%
+  mutate(berry.group = ifelse(Timepoint == "tB", 1, 0))
+```
+
 # Heatmap
 
 ```{r}
@@ -101,4 +115,22 @@ ggsave("../figures/heatmap_metabolites_BRB-v-other.png")
 
 # Modelling
 
+```{r}
+capture.models.univ.former <- function(outcome, lfun, mics, modin){
+  mods.list <- lapply(mics, function(x)  try({glm(as.formula(paste0(outcome, " ~ ", x)), family = lfun, data = modin) %>% tidy()}))
+  mods.list.clean <- list.clean(mods.list, function(x) is.null(x))
+  mods.df <- bind_rows(mods.list.clean)
+  return(mods.df)
+}
+```
 
+```{r}
+modres <-capture.models.univ.former("berry.group", "binomial",
+                                    metnames.form$abbrieve, moddat) %>%
+  filter(term != "(Intercept)") %>%
+  rename("abbrieve" = "term") %>%
+  left_join(metnames.form, .) %>%
+  arrange(p.value)
+
+write.csv(modres, "../data/modelling_metabolomics-berrygroup.csv", row.names = F)
+```
