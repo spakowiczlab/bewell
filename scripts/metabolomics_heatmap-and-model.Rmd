@@ -90,9 +90,9 @@ hmap.colord.ext <- hmap.colord$labels[hmap.colord$order]
 # earlysamps <- timepoint.key %>%
 #   filter(placebo == "Week 6")
 moddat <- metabs.l %>%
-  filter(
-    Subject.ID %in% earlysamps$Subject.ID &
-           Timepoint %in% c("rB", "tB")) %>%
+  # filter(
+  #   Subject.ID %in% earlysamps$Subject.ID &
+  #          Timepoint %in% c("rB", "tB")) %>%
   pivot_wider(names_from = metab.id, values_from = ng.ml) %>%
   mutate(berry.group = ifelse(Timepoint == "tB", 1, 0))
 ```
@@ -130,7 +130,8 @@ modres <-capture.models.univ.former("berry.group", "binomial",
   filter(term != "(Intercept)") %>%
   rename("abbrieve" = "term") %>%
   left_join(metnames.form, .) %>%
-  arrange(p.value)
+  arrange(p.value) %>%
+  mutate(padj = p.adjust(p.value, method = "fdr"))
 
 write.csv(modres, "../data/modelling_metabolomics-berrygroup.csv", row.names = F)
 ```
