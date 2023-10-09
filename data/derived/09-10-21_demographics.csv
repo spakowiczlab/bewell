@@ -1,0 +1,105 @@
+"","subject_number","sex","race","ethnicity","antibiotics","age","smoking_status_ES","smoking_status_MHQ","METwalking","METmoderate","METvig","METmins","IPAQscore"
+"1",1,"male","White",NA,NA,67,"past smoker","past smoker",1188,1440,5760,8388,"HEPA active"
+"2",2,"male",NA,NA,NA,58,"past smoker","current smoker",NA,NA,NA,NA,NA
+"3",3,"female","White",NA,"No",60,"past smoker","past smoker",1386,1440,5760,8586,"HEPA active"
+"4",4,"female",NA,NA,NA,74,"current smoker",NA,NA,NA,NA,NA,NA
+"5",5,"female","White",NA,"Yes",60,"current smoker","current smoker",0,0,0,0,"Inactive"
+"6",6,"female",NA,NA,NA,75,"current smoker",NA,NA,NA,NA,NA,NA
+"7",7,"female","Black or African American",NA,"No",64,"past smoker","past smoker",148.5,1200,0,1348.5,"Minimally active"
+"8",8,"female",NA,NA,NA,59,"past smoker",NA,NA,NA,NA,NA,NA
+"9",9,"male",NA,NA,NA,72,"past smoker",NA,NA,NA,NA,NA,NA
+"10",10,"female",NA,NA,NA,64,"current smoker",NA,NA,NA,NA,NA,NA
+"11",11,"male",NA,NA,NA,73,"past smoker",NA,NA,NA,NA,NA,NA
+"12",12,"male",NA,NA,NA,73,NA,NA,NA,NA,NA,NA,NA
+"13",13,"female",NA,NA,NA,76,"past smoker",NA,NA,NA,NA,NA,NA
+"14",14,"female",NA,NA,NA,70,NA,NA,NA,NA,NA,NA,NA
+"15",15,"male",NA,NA,NA,67,"past smoker",NA,NA,NA,NA,NA,NA
+"16",16,"female","White",NA,"No",62,"past smoker","current smoker",NA,NA,NA,NA,NA
+"17",17,"female",NA,NA,NA,74,"past smoker","past smoker",132,2160,0,2292,"Minimally active"
+"18",18,"female","Asian",NA,"No",66,"past smoker","past smoker",NA,NA,NA,NA,NA
+"19",19,"male","Black or African American",NA,"No",70,"past smoker","past smoker",165,0,240,405,"Minimally active"
+"20",20,"female","White","Unknown / not reported","No",68,"current smoker","current smoker",NA,NA,NA,NA,NA
+"21",21,"male","White",NA,"No",77,"past smoker","past smoker",990,0,0,990,"Minimally active"
+"22",22,"female",NA,NA,NA,66,"past smoker",NA,NA,NA,NA,NA,NA
+"23",23,"male",NA,NA,NA,70,"past smoker",NA,NA,NA,NA,NA,NA
+"24",24,"male","White",NA,"No",77,"past smoker","past smoker",NA,NA,NA,NA,NA
+"25",25,"male",NA,NA,NA,74,"current smoker",NA,NA,NA,NA,NA,NA
+"26",26,"female",NA,NA,NA,68,"past smoker",NA,NA,NA,NA,NA,NA
+"27",27,"female",NA,NA,NA,66,NA,NA,NA,NA,NA,NA,NA
+"28",28,"male",NA,NA,NA,64,"past smoker",NA,NA,NA,NA,NA,NA
+"29",29,"male","White",NA,"No",63,"past smoker","past smoker",NA,NA,NA,NA,NA
+"30",30,"female",NA,NA,NA,64,"current smoker",NA,NA,NA,NA,NA,NA
+"31",31,"female",NA,NA,NA,63,"current smoker",NA,NA,NA,NA,NA,NA
+"32",32,"female",NA,NA,NA,66,NA,NA,NA,NA,NA,NA,NA
+"33",33,"female",NA,NA,NA,65,"current smoker",NA,NA,NA,NA,NA,NA
+"34",34,"female",NA,NA,NA,73,NA,NA,NA,NA,NA,NA,NA
+"35",35,"male",NA,NA,NA,60,NA,NA,NA,NA,NA,NA,NA
+"36",36,"female",NA,NA,NA,65,"past smoker",NA,NA,NA,NA,NA,NA
+"37",37,"female",NA,NA,NA,75,"current smoker",NA,NA,NA,NA,NA,NA
+"38",38,"female",NA,NA,NA,59,"past smoker",NA,NA,NA,NA,NA,NA
+"39",39,"male",NA,NA,NA,74,"past smoker",NA,NA,NA,NA,NA,NA
+"40",40,"male",NA,NA,NA,79,NA,NA,NA,NA,NA,NA,NA
+"41",41,"male",NA,NA,NA,71,"past smoker",NA,NA,NA,NA,NA,NA
+"42",42,"female",NA,NA,NA,60,"past smoker",NA,NA,NA,NA,NA,NA
+"43",43,"female",NA,NA,NA,59,NA,NA,NA,NA,NA,NA,NA
+"44",44,"female",NA,NA,NA,68,"past smoker",NA,NA,NA,NA,NA,NA
+"45",45,NA,NA,NA,NA,NA,NA,NA,NA,NA,NA,NA,NA
+"46",46,NA,NA,NA,NA,NA,NA,NA,NA,NA,NA,NA,NA
+"47",47,NA,NA,NA,NA,NA,NA,NA,NA,NA,NA,NA,NA
+"48",48,"male",NA,NA,NA,NA,NA,NA,NA,NA,NA,NA,NA
+"49",49,NA,NA,NA,NA,NA,NA,NA,NA,NA,NA,NA,NA
+"50",50,NA,NA,NA,NA,NA,NA,NA,NA,NA,NA,NA,NA
+"51",51,"female",NA,NA,NA,61,NA,NA,NA,NA,NA,NA,NA
+"52",52,"female","White",NA,"No",71,"past smoker","past smoker",0,240,0,240,"Inactive"
+"53",53,"female","White","NOT Hispanic or Latino","Yes",64,"past smoker","past smoker",NA,NA,NA,NA,NA
+"54",54,"male","White",NA,"No",69,"current smoker","current smoker",198,600,1200,1998,"HEPA active"
+"55",55,"male","White",NA,"No",68,"past smoker","past smoker",396,720,1800,2916,"HEPA active"
+"56",56,"female","White",NA,"No",61,"past smoker","past smoker",0,600,0,600,"Minimally active"
+"57",57,"male","White","NOT Hispanic or Latino","No",74,"past smoker","past smoker",165,360,960,1485,"HEPA active"
+"58",58,"male","White","NOT Hispanic or Latino","No",60,"past smoker","past smoker",0,0,0,0,"Inactive"
+"59",59,"female",NA,"NOT Hispanic or Latino","No",58,"current smoker","current smoker",NA,NA,NA,NA,NA
+"60",60,"male","White","NOT Hispanic or Latino","No",60,"past smoker","past smoker",11088,360,240,11688,"Minimally active"
+"61",61,"male","White","NOT Hispanic or Latino","No",68,"past smoker","past smoker",0,1440,480,1920,"Inactive"
+"62",62,"male","White","NOT Hispanic or Latino","Yes",69,"current smoker","current smoker",264,240,240,744,"Minimally active"
+"63",63,"male",NA,NA,NA,56,"current smoker",NA,NA,NA,NA,NA,NA
+"64",64,"female","White","NOT Hispanic or Latino","Yes",69,"past smoker","never smoked",1320,960,720,3000,"Minimally active"
+"65",65,"female","White","NOT Hispanic or Latino","No",65,"past smoker","past smoker",742.5,60,0,802.5,"Minimally active"
+"66",66,"female","White","NOT Hispanic or Latino","No",65,"past smoker","past smoker",5940,0,0,5940,"Minimally active"
+"67",67,"male",NA,NA,NA,60,"current smoker",NA,NA,NA,NA,NA,NA
+"68",68,"female","White",NA,"Yes",60,"past smoker","past smoker",3168,1440,9600,14208,"HEPA active"
+"69",69,"female",NA,NA,NA,70,"past smoker",NA,NA,NA,NA,NA,NA
+"70",70,"female","Black or African American",NA,"No",72,"current smoker","current smoker",1980,0,0,1980,"Inactive"
+"71",71,"male",NA,"NOT Hispanic or Latino","Yes",58,"current smoker","current smoker",NA,NA,NA,NA,NA
+"72",72,"female","White",NA,"No",62,"current smoker","current smoker",0,0,0,0,"Inactive"
+"73",73,"female","White","NOT Hispanic or Latino","No",56,"current smoker","current smoker",0,4320,320,4640,"Inactive"
+"74",74,"female","White","NOT Hispanic or Latino","No",69,"current smoker","current smoker",0,120,0,120,"Inactive"
+"75",75,"female",NA,NA,NA,60,"past smoker",NA,NA,NA,NA,NA,NA
+"76",76,"female","White",NA,"No",60,"past smoker","past smoker",2772,180,120,3072,"Minimally active"
+"77",77,"female","White",NA,"No",62,"past smoker","past smoker",297,0,0,297,"Inactive"
+"78",78,"male",NA,NA,NA,71,"past smoker",NA,NA,NA,NA,NA,NA
+"79",79,"female","White","NOT Hispanic or Latino","No",60,"past smoker","past smoker",2772,0,0,2772,"Minimally active"
+"80",80,"female",NA,NA,NA,58,"current smoker",NA,NA,NA,NA,NA,NA
+"81",81,"male","White","NOT Hispanic or Latino","No",68,"past smoker","past smoker",1386,480,0,1866,"Minimally active"
+"82",82,"female",NA,NA,NA,68,"current smoker",NA,NA,NA,NA,NA,NA
+"83",83,"male",NA,NA,NA,55,"current smoker",NA,NA,NA,NA,NA,NA
+"84",84,"male","White","NOT Hispanic or Latino","Yes",68,"current smoker","current smoker",297,160,0,457,"Minimally active"
+"85",85,"male","Black or African American","NOT Hispanic or Latino","Yes",66,"current smoker","current smoker",15840,0,0,15840,"Minimally active"
+"86",86,"male",NA,NA,NA,58,"current smoker",NA,NA,NA,NA,NA,NA
+"87",87,"female","White","NOT Hispanic or Latino","No",60,"past smoker","past smoker",2772,3360,0,6132,"Minimally active"
+"88",88,"male","Black or African American",NA,"No",57,"current smoker","current smoker",198,720,1080,1998,"HEPA active"
+"89",89,"male","White",NA,"No",64,"past smoker","past smoker",891,0,0,891,"Inactive"
+"90",90,"female",NA,"NOT Hispanic or Latino","No",66,"current smoker","current smoker",NA,NA,NA,NA,NA
+"91",91,"female","White",NA,"No",60,"past smoker","past smoker",9702,11760,0,21462,"Minimally active"
+"92",92,"female","White","NOT Hispanic or Latino","Yes",71,"current smoker","current smoker",99,480,0,579,"Inactive"
+"93",93,"female",NA,NA,NA,59,"current smoker",NA,NA,NA,NA,NA,NA
+"94",94,"female",NA,NA,NA,66,"current smoker",NA,NA,NA,NA,NA,NA
+"95",95,"male","White",NA,"No",71,"past smoker","past smoker",297,0,120,417,"Inactive"
+"96",96,"female","White","NOT Hispanic or Latino","No",60,"past smoker","past smoker",594,540,0,1134,"Minimally active"
+"97",97,"female","White","NOT Hispanic or Latino","No",66,"past smoker","past smoker",495,0,0,495,"Minimally active"
+"98",98,"female",NA,NA,NA,65,"past smoker",NA,NA,NA,NA,NA,NA
+"99",99,"female","White","NOT Hispanic or Latino","No",58,"past smoker","current smoker",13464,960,0,14424,"Minimally active"
+"100",100,"female",NA,NA,NA,58,"past smoker",NA,NA,NA,NA,NA,NA
+"101",101,"male","White",NA,"No",69,"current smoker","current smoker",5544,3600,4320,13464,"HEPA active"
+"102",102,"female","White","NOT Hispanic or Latino","No",58,"past smoker","past smoker",330,480,0,810,"Minimally active"
+"103",103,"male",NA,NA,NA,59,"past smoker",NA,NA,NA,NA,NA,NA
+"104",104,"female","White",NA,"Yes",56,"past smoker","past smoker",0,240,480,720,"Inactive"
