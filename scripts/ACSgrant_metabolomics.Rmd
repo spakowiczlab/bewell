@@ -57,13 +57,13 @@ met %>%
   filter(!is.na(Timepoint)) %>%
   ggplot(aes(x = Timepoint, y = value)) +
   geom_boxplot() +
-  facet_wrap(metabolite ~ .) +
+  facet_wrap(metabolite ~ ., scales = "free_y") +
   xlab("") +
   ylab("ng/mL") + 
   theme(base.size = 10) +
   theme_bw()
 
-ggsave("../figures/metabolomics_boxplot.png", dev="png", height = 6, width = 4, dpi = 400)
+ggsave("../figures/metabolomics_boxplot.png", dev="png", height = 6, width = 5, dpi = 400)
 ```
 
 
