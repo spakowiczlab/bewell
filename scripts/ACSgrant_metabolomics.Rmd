@@ -1,0 +1,69 @@
+---
+title: "metabolomics check"
+author: "Caroline Wheeler"
+date: "10/11/2023"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+
+library(tidyverse)
+library(readxl)
+```
+
+read in data
+```{r}
+key.long <- read.csv("../data/derived/timepoint_key_long.csv")
+met <- read_excel("../data/raw/urine-metabolomics/Dan Urine Anthocyanin 11-10-2022.xlsx", sheet = "concentration ng mL") %>%
+  filter(!is.na(`21-V2`))
+```
+
+```{r}
+met <- met %>%
+  mutate_at(vars(-...1), ~as.numeric(.)) %>%
+  mutate_at(vars(-...1), ~replace(., is.na(.), 0)) %>%
+  pivot_longer(
+    cols = 2:81, 
+    names_to = "Sample",
+    values_to = "value",
+    values_transform = ~ as.numeric(gsub(",", "", .x))
+  ) %>%
+  rename("metabolite" = `...1`) %>%
+  separate(Sample, c("Subject.Number", "v")) %>%
+  mutate(v = toupper(v))
+```
+prep key
+```{r}
+key.long <- key.long %>%
+  mutate(v =  toupper(substr(timepoints, 11, 12)),
+         v = ifelse(v == "-V", toupper(substr(timepoints, 12, 13)), v),
+         Subject.Number = as.character(Subject.Number)) %>%
+  select(Subject.Number, v, Timepoint) 
+
+# join to met 
+met <- met %>%
+  left_join(key.long)
+```
+
+Note: key.long doesn't include participants 84, 101, 102 that are present in metabolomics data
+Would like to check that the timepoint key includes all participants as it was developed early on...
+
+plot metabolites
+```{r}
+met$Timepoint <- factor(met$Timepoint, levels=c("rP", "tP", "rB", "tB"))
+
+met %>%
+  filter(!is.na(Timepoint)) %>%
+  ggplot(aes(x = Timepoint, y = value)) +
+  geom_boxplot() +
+  facet_wrap(metabolite ~ .) +
+  xlab("") +
+  ylab("ng/mL") + 
+  theme(base.size = 10) +
+  theme_bw()
+
+ggsave("../figures/metabolomics_boxplot.png", dev="png", height = 6, width = 4, dpi = 400)
+```
+
+
