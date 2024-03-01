@@ -186,15 +186,6 @@ ggsave("../figures/ACC22_effect-size_volcano-plot.png",
 
 
 
-=======
-  geom_label_repel(show.legend = F)
-
-
-ggsave("../figures/effect-size_volcano-plot.png")
-```
-
->>>>>>> 574b286f27fdc935dec5f45962a7446a3d83723e
-
 SCRATCH WORK BELOW
 function to run wilcox test on pre/post BRB and return table of p-values
 ```{r}
