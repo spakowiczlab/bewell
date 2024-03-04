@@ -135,7 +135,7 @@ ggplot(phylo.coords$Segments) +
   lims(x = c(0,1.025)) +
   labs(x = "", y = "") +
   scale_color_manual(values = "darkred") +
-  theme_void() +
+  theme_minimal() +
   theme(axis.text = element_blank(),
         axis.ticks = element_blank(),
         panel.grid = element_blank())
