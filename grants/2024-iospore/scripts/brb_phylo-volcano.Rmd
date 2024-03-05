@@ -202,13 +202,23 @@ plotdat <- modres %>%
 
 plotdat %>%
   ggplot(aes(x = l2fc, y = -log(p.value), color = Lachno, label = highlight)) +
-  geom_point() +
+  geom_point(show.legend = F) +
   geom_hline(yintercept = -log(.05)) +
   geom_label_repel(show.legend = F) +
   scale_color_manual(values = c("darkred", "orange"), name = "") +
   labs(x = "Log2FoldChange") +
   theme_bw(base_size = 14)
 ggsave("../figures/volcano_brb-enrich_l2fc.png", height = 2.5, width = 4)
+
+plotdat %>%
+  ggplot(aes(x = l2fc, y = -log(p.value), color = Lachno, label = highlight)) +
+  geom_point() +
+  geom_hline(yintercept = -log(.05)) +
+  geom_label_repel(show.legend = F) +
+  scale_color_manual(values = c("darkred", "orange"), name = "") +
+  labs(x = "Log2FoldChange") +
+  theme_bw(base_size = 14)
+ggsave("../figures/volcano_brb-enrich_l2fc_legend.png", height = 2.5, width = 4)
 ```
 
 # Bootstrap p value
