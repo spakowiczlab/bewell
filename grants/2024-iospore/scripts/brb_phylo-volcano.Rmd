@@ -51,7 +51,7 @@ lachno.taxids <- unique(subset(allspecs$TaxNum, grepl("f__Lachno", allspecs$Taxo
 ```{r}
 brb.enriched <- modres %>%
   filter(estimate > 0 &
-           p.value < 0.105 &
+           p.value < 0.05 &
          term %in% allspecs.remtax) %>%
   mutate(lachno = ifelse(term %in% lachno.remtax, "Lachno", "Not Lachno"))
 
@@ -140,6 +140,7 @@ ggplot(phylo.coords$Segments) +
         axis.ticks = element_blank(),
         panel.grid = element_blank())
 ggsave("../figures/circle_phylo_all-highlight-lach.png")
+ggsave("../figures/circle_phylo_all-highlight-lach.svg")
 ```
 
 # Volcano plot
@@ -193,21 +194,21 @@ points.foldchange <- lapply(1:6, function(x) prepareFoldChangeLev(set.levin[x], 
 ```{r}
 plotdat <- modres %>%
   left_join(points.foldchange) %>%
-  mutate(highlight = ifelse(p.value < 0.105, str_replace(str_remove(term, "\\w__"), "_", " "), NA),
-         # Lachno = case_when(term %in% lachno.remtax & !is.na(highlight) ~ "Lachno", # All sigs are lachno
-         #                    !(term %in% lachno.remtax) & !is.na(highlight) ~"Not Lachno"),
-         tlev = ifelse(!is.na(highlight), str_sub(term,1,1), NA)
+  filter(grepl("s__", term)) %>%
+  mutate(highlight = ifelse(p.value < 0.05, str_replace(str_remove(term, "\\w__"), "_", " "), NA),
+         Lachno = case_when(term %in% lachno.remtax ~ "Lachnospiraceae",
+                            !(term %in% lachno.remtax) ~"Other")
          )
 
 plotdat %>%
-  ggplot(aes(x = l2fc, y = -log(p.value), color = tlev, label = highlight)) +
+  ggplot(aes(x = l2fc, y = -log(p.value), color = Lachno, label = highlight)) +
   geom_point() +
-  geom_label_repel() +
-  geom_hline(yintercept = -log(.105)) +
-  scale_color_manual(values = c("orange", "darkred"), name = "Taxa\nlevel", labels = c("Genus", "Species")) +
+  geom_hline(yintercept = -log(.05)) +
+  geom_label_repel(show.legend = F) +
+  scale_color_manual(values = c("darkred", "orange"), name = "") +
   labs(x = "Log2FoldChange") +
-  theme_bw()
-ggsave("../figures/volcano_brb-enrich_l2fc.png")
+  theme_bw(base_size = 14)
+ggsave("../figures/volcano_brb-enrich_l2fc.png", height = 2.5, width = 4)
 ```
 
 # Bootstrap p value
@@ -217,12 +218,12 @@ ggsave("../figures/volcano_brb-enrich_l2fc.png")
 sample.vec <- ifelse(allspecs.remtax %in% lachno.remtax, "Lachno", "Not Lachno")
 
 set.seed(112358)
-sample.seeds <- runif(1000, 1e4, 1e5)
+sample.seeds <- runif(10000, 1e4, 1e5)
 
 lachno.draws <-vector()
 for(i in sample.seeds){
   set.seed((i))
-  pullspecs <- sample(sample.vec, 4, replace = F)
+  pullspecs <- sample(sample.vec, 2, replace = F)
   res <- all(pullspecs == "Lachno")
   lachno.draws <- append(lachno.draws, res)
 }
