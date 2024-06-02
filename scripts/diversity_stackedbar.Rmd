@@ -18,7 +18,8 @@ library(patchwork)
 
 read in data
 ```{r}
-df <- read.csv("/fs/ess/PAS1695/projects/bewell/data/bewell_taxonomy_relAbun.csv")
+df <- read.csv("../data/derived/bewell_taxonomy_relAbun.csv")
+df <-  read.csv("../data/derived/bewell_taxonomy_relAbun.csv")
 ```
 
 Seperate taxonomy variable by level of taxononmy
@@ -135,6 +136,71 @@ g <- exora.p.hist %>%
    facet_row(vars(variable), scales = "free_x", space = "free") 
 
 g
+```
+```{r}
+df <- exora.p.hist %>%
+  mutate(variable2 = case_when(
+    variable == "rB" ~ "Pre BRB",
+    variable == "rP" ~ "Pre Placebo",
+    variable == "tB" ~ "Post BRB",
+    variable == "tP" ~ "Post Placebo"
+  ),
+  variable2 = factor(variable2, levels = c("Pre Placebo", "Post Placebo", "Pre BRB", "Post BRB"))
+  )
+
+g1 <- df %>%
+  ggplot(aes(x = sample, y = ra, fill = Phylum)) +
+  geom_bar(position = "fill", stat = "identity") +
+  labs(x = "", y = "") +
+  scale_fill_manual(values = c("darkslateblue", "darkgoldenrod2", "cornflowerblue", "darkgreen", "darkorange4", "salmon2", "cornflowerblue", "deeppink4", "cyan4", "salmon2"), name = "Taxa") +
+  theme_minimal(base_size = 18) +
+  theme(axis.text.x = element_blank(), 
+        axis.ticks.x = element_blank(),
+        axis.text.y = element_blank(),
+        panel.grid.major = element_blank(),
+        strip.text.x = element_text(size = 8)) +
+  facet_row(vars(variable2), scales = "free_x", space = "free", strip.position = "bottom")
+
+g1
+
+```
+
+
+```{r}
+g1 <- df %>% 
+  ggplot(aes(x = sample, y = ra, fill = Phylum)) +
+    geom_bar(position="fill", stat = "identity") +
+    labs(x = "", y = "") +
+    scale_fill_manual(values = c("darkslateblue", "darkgoldenrod2","cornflowerblue", "darkgreen", "darkorange4","salmon2", "cornflowerblue", "deeppink4" ,"cyan4", "salmon2"), name = "Taxa") +
+    theme_minimal(base_size = 18) +
+    theme(axis.text.x = element_blank(), 
+          axis.ticks.x = element_blank(),
+          axis.text.y = element_blank(),
+          panel.grid.major = element_blank(),
+          strip.text.x = element_text(size = 12)) +
+   facet_row(vars(variable2), scales = "free_x", space = "free", strip.position = "bottom") 
+
+g1
+ggsave("../figures/fig2B.svg", width = 10, height = 4)
+```
+```{r}
+g1 <- df %>%
+  ggplot(aes(x = sample, y = ra, fill = Phylum)) +
+  geom_bar(position="fill", stat = "identity") +
+  labs(x = "", y = "") +
+  scale_fill_manual(values = c("darkslateblue", "darkgoldenrod2", "cornflowerblue", "darkgreen", "darkorange4", "salmon2", "cornflowerblue", "deeppink4", "cyan4", "salmon2"), name = "Taxa") +
+  theme_minimal(base_size = 9) +  # Set the base text size to 9
+  theme(axis.text.x = element_blank(), 
+        axis.ticks.x = element_blank(),
+        axis.text.y = element_blank(),
+        panel.grid.major = element_blank(),
+        strip.text.x = element_text(size = 19), 
+        legend.text = element_text(size = 20), 
+        legend.title = element_text(size = 24)) + 
+  facet_row(vars(variable2), scales = "free_x", space = "free", strip.position = "bottom")
+
+ggsave("../figures/fig2B-updated.svg", width = 10, height = 4)
+g1
 ```
 
 
