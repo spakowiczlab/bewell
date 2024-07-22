@@ -27,25 +27,25 @@ for(s in samples){
 }
 
 
-# res.dir <- "/fs/scratch/PAS1695/projects/iobio/humann3/"
-# res.files <- list.files(res.dir)
-# 
-# mettab.ls <- lapply(samples, function(x) read.table(paste0("/fs/scratch/PAS1695/projects/iobio/humann3/",
-#                                                            x, "/",x, "_humann_temp/", x, "_metaphlan_bugs_list.tsv"),
-#                                                     header = F, sep = "\t", stringsAsFactors = F) %>%
-#                       mutate(V2 = as.character(V2)))
-# names(mettab.ls) <- samples
-# metab.df <- bind_rows(lapply(samples, function(x) mettab.ls[[x]] %>% mutate(sample = x)))
-# 
-# 
-# 
-# metab.df.form <- metab.df %>%
-#   rename("Taxonomy" = "V1",
-#          "TaxNum" = "V2",
-#          "RelAbun" = "V3",
-#          "Alternative.Tax" = "V4")
-# write.csv(metab.df.form, "/fs/ess/PAS1695/projects/iobio/2023-12-07_mpa-aggregate.csv", row.names = F)
-# write.csv(metab.df.form, "../data/2023-12-07_mpa-aggregate.csv", row.names = F)
+dir <- file.path("/fs", "ess", "PAS1695","projects", "bewell", "data", "humann3")
+samples <- list.dirs(dir, recursive = F, full.names = F)
+
+mettab.ls <- lapply(samples, function(x) read.table(paste0(dir, "/",
+                                                           x, "/",x, "_humann_temp/", x, "_metaphlan_bugs_list.tsv"),
+                                                    header = F, sep = "\t", stringsAsFactors = F) %>%
+                      mutate(V2 = as.character(V2)))
+
+names(mettab.ls) <- samples
+metab.df <- bind_rows(lapply(samples, function(x) mettab.ls[[x]] %>% mutate(sample = x)))
+
+metab.df.form <- metab.df %>%
+  dplyr::rename("Taxonomy" = "V1",
+                "TaxNum" = "V2",
+                "RelAbun" = "V3",
+                "Alternative.Tax" = "V4")
+
+out.dir.m <- paste0("/fs/ess/PAS1695/projects/bewell/data/2024-02-01_mpa-aggregate.csv")
+write.csv(metab.df.form, out.dir.m, row.names = F)
 
 humann.ls <- lapply(samples, function(x) read.table(paste0("/fs/ess/PAS1695/projects/bewell/data/humann3/",
                                                            x, "/",x, "_pathabundance.tsv"),
