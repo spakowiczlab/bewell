@@ -230,28 +230,32 @@ mosaicplot(table(lach),
 # )
 
 # glammed up mosaic plot
-lach$Activity <- factor(lach$Activity, levels = c("active", "inactive"))
-lach$Lachnospiraceae <- factor(lach$Lachnospiraceae, levels = c("BRB not effective", "BRB effective"))
+lach <- lach %>%
+  mutate(Activity = ifelse(Activity == "active", "Active", "Inactive"),
+         Lachnospiraceae = ifelse(Lachnospiraceae == "BRB effective", "BRB Effective", "BRB Not Effective"))
+
+lach$Activity <- factor(lach$Activity, levels = c("Active", "Inactive"))
+lach$Lachnospiraceae <- factor(lach$Lachnospiraceae, levels = c("BRB Not Effective", "BRB Effective"))
 
 lach %>%
-  mutate(Activity = ifelse(Activity == "active", "Active", "Inactive")) %>%
+  mutate(Activity = ifelse(Activity == "active", "Active", "Inactive"),
+         Lachnospiraceae = ifelse(Lachnospiraceae == "BRB effective", "BRB Effective", "BRB Not Effective")) %>%
   ggplot() +
   geom_mosaic(aes(x = product(Activity, Lachnospiraceae), fill = Activity, alpha = Lachnospiraceae), show.legend = FALSE) +
   scale_fill_manual(values = c("cornflowerblue", "olivedrab4")) + 
   scale_alpha_manual(values =c(.7,.9)) +
   xlab("Lachnospiraceae enriched") +
   ylab("IPAQ Score") +
-  theme(base_size = 9, legend.position = "none") +
+  theme(base_size = 11, legend.position = "none") +
   theme_bw()
 
 ggsave("../figures/ACSgrant_mosaicplot.png", dev = "png", height = 4, width = 5, dpi=400)
 
 lach %>%
-  mutate(Activity = ifelse(Activity == "active", "Active", "Inactive")) %>%
   ggplot() +
   geom_mosaic(aes(x = product(Activity, Lachnospiraceae), fill = Activity, alpha = Lachnospiraceae), show.legend = FALSE) +
-  geom_mosaic_text(aes(x = product(Activity, Lachnospiraceae))) +
-  scale_fill_manual(values = c("cornflowerblue", "olivedrab4")) + 
+  geom_mosaic_text(aes(x = product(Activity, Lachnospiraceae)), size = 4.5) +
+  scale_fill_manual(values = c("lightskyblue", "salmon2")) + 
   scale_alpha_manual(values =c(.7,.9)) +
   xlab("") +
   ylab("") +

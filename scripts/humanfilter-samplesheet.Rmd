@@ -1,0 +1,39 @@
+---
+title: "generate sample sheets"
+author: "Caroline Wheeler"
+date: "7/5/2024"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+
+library(tidyverse)
+```
+
+```{r}
+path <- "/fs/ess/PDE0023/bewell/fastqs/"
+x <- list.files(path = path, full.names = F)
+x <- gsub(".fastq.gz", "", x)
+x
+```
+```{r}
+df <- as.data.frame(x) %>%
+  dplyr::rename("sample_name" = x) %>%
+  mutate(project = "bewell",
+         sample_type = "dna")
+
+df2 <- as.data.frame(x) %>%
+  dplyr::rename("sample_name" = x) %>%
+  mutate(subsample = sample_name,
+         protocol = "dna",
+         seq_method = "single-read")
+```
+
+save
+```{r}
+write.csv(df, "/users/PAS1695/whee57/Github/Sapiens_be_gone/config/bewell-samples.csv", row.names = F)
+write.csv(df2, "/users/PAS1695/whee57/Github/Sapiens_be_gone/config/bewell-subsamples.csv", row.names = F)
+```
+
+
