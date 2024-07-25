@@ -31,20 +31,15 @@ keep <- subs %>%
 df <- merge(keep, df)
 ```
 
-save table
-```{r}
-write.csv(df,"/fs/ess/PAS1695/projects/bewell/data/2024-02-01_bewell_taxonomy_relAbun.csv", row.names = FALSE)
-```
-
 ## Create long form tables for each taxonomic level
 
 Seperate taxonomic levels
 ```{r}
-df <- df %>%
+df.tax <- df %>%
   mutate(sampleID = paste0(Subject.Number, "-", variable)) %>%
   select(sampleID, Taxonomy, RelAbun)
 
-taxa <- df %>% 
+taxa <- df.tax %>% 
   separate(Taxonomy, c("Kingdom", "Phylum", "Class", "Order", "Family", "Genus", "Species", "t"), "\\|")
 
 get_level <- function(lev, next_lev){
@@ -95,4 +90,14 @@ write.csv(df_ord,"/fs/ess/PAS1695/projects/bewell/data/RelAbun/2024-02-01_RelAbu
 write.csv(df_fam,"/fs/ess/PAS1695/projects/bewell/data/RelAbun/2024-02-01_RelAbun_fam.csv")
 write.csv(df_gen,"/fs/ess/PAS1695/projects/bewell/data/RelAbun/2024-02-01_RelAbun_gen.csv")
 write.csv(df_spec,"/fs/ess/PAS1695/projects/bewell/data/RelAbun/2024-02-01_RelAbun_spec.csv")
+```
+remove rows with t_SGB to avoid duplicates 
+```{r}
+df <- df %>%
+  filter(!grepl("t__SGB", Taxonomy))
+```
+
+save table
+```{r}
+write.csv(df,"/fs/ess/PAS1695/projects/bewell/data/2024-02-01_bewell_taxonomy_relAbun.csv", row.names = FALSE)
 ```
