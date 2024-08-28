@@ -43,7 +43,7 @@ writeLines(c(paste0("#PBS -N bewell-srascrub"),
                "",
           
                paste0("./scripts/scrub.sh -i ", fastq, 
-                      " -o /fs/ess/PAS1695/projects/bewell/data/fastqs/sra-scrubbed/${snames[$PBS_ARRAY_INDEX]}.fastq")
+                      " -o - -p 8 /fs/ess/PAS1695/projects/bewell/data/fastqs/sra-scrubbed/${snames[$PBS_ARRAY_INDEX]}.fastq 2> /fs/ess/PAS1695/projects/bewell/scripts/logs/srasrub-${snames[$PBS_ARRAY_INDEX]}.log")
                
   ),
   

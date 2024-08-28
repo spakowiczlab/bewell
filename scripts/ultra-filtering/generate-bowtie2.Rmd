@@ -41,8 +41,7 @@ writeLines(c(paste0("#PBS -N bewell-bowtie2"),
                "source activate bowtie2",
                "",
           
-               paste0("bowtie2 -x /fs/ess/PAS1695/db/bowtie2-ultrafiltering/merged_ref -U ", fastq, 
-                      " -S /fs/ess/PAS1695/projects/bewell/data/fastqs/bowties/${snames[$PBS_ARRAY_INDEX]}.sam")
+               "bowtie2 -x /fs/ess/PAS1695/db/bowtie2-ultrafiltering/merged_ref -U /fs/ess/PAS1695/projects/bewell/data/fastqs/sra-scrubbed/${snames[$PBS_ARRAY_INDEX]}.fastq -S /fs/ess/PAS1695/projects/bewell/data/fastqs/bowties/${snames[$PBS_ARRAY_INDEX]}.sam -p 8 2> /fs/ess/PAS1695/projects/bewell/scripts/logs/bowtie2-${snames[$PBS_ARRAY_INDEX]}.log"
                
   ),
   

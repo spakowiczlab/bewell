@@ -44,7 +44,7 @@ writeLines(c(paste0("#PBS -N bewell-fastp"),
                "",
           
                paste0("fastp -i ", fastq, 
-                      " -o /fs/ess/PAS1695/projects/bewell/data/fastqs/fastp/${snames[$PBS_ARRAY_INDEX]}.fastq")
+                      " -o /fs/ess/PAS1695/projects/bewell/data/fastqs/fastp/${snames[$PBS_ARRAY_INDEX]}.fastq 2> /fs/ess/PAS1695/projects/bewell/scripts/logs/fastp-${snames[$PBS_ARRAY_INDEX]}.log")
                
   ),
   
