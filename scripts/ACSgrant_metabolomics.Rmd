@@ -10,9 +10,12 @@ knitr::opts_chunk$set(echo = TRUE)
 
 library(tidyverse)
 library(readxl)
+library(pheatmap)
+
 ```
 
 read in data
+
 ```{r}
 key.long <- read.csv("../data/derived/timepoint_key_long.csv")
 met <- read_excel("../data/raw/urine-metabolomics/Dan Urine Anthocyanin 11-10-2022.xlsx", sheet = "concentration ng mL") %>%
@@ -33,7 +36,9 @@ met <- met %>%
   separate(Sample, c("Subject.Number", "v")) %>%
   mutate(v = toupper(v))
 ```
+
 prep key
+
 ```{r}
 key.long <- key.long %>%
   mutate(v =  toupper(substr(timepoints, 11, 12)),
@@ -46,10 +51,10 @@ met <- met %>%
   left_join(key.long)
 ```
 
-Note: key.long doesn't include participants 84, 101, 102 that are present in metabolomics data
-Would like to check that the timepoint key includes all participants as it was developed early on...
+Note: key.long doesn't include participants 84, 101, 102 that are present in metabolomics data Would like to check that the timepoint key includes all participants as it was developed early on...
 
 plot metabolites
+
 ```{r}
 met$Timepoint <- factor(met$Timepoint, levels=c("rP", "tP", "rB", "tB"))
 
@@ -66,4 +71,322 @@ met %>%
 ggsave("../figures/metabolomics_boxplot.png", dev="png", height = 6, width = 5, dpi = 400)
 ```
 
+### author: "SJ"
 
+```{r}
+# Rename levels for legend clarity
+met_brb <- met %>%
+  filter(Timepoint %in% c("rB", "tB")) %>%
+  mutate(
+    Timepoint = factor(Timepoint, levels = c("rB", "tB")),
+    Timepoint = recode(Timepoint, "rB" = "Pre-BRB", "tB" = "Post-BRB")
+  )
+
+# Plot
+ggplot(met_brb, aes(x = Timepoint, y = value, group = Subject.Number)) +
+  geom_line(color = "gray40", alpha = 0.5) +
+  geom_point(aes(color = Timepoint), size = 2) +
+  facet_wrap(~ metabolite, scales = "free_y") +
+  scale_color_manual(values = c("Pre-BRB" = "gold", "Post-BRB" = "purple4")) +
+  labs(
+    y = "ng/mL",
+    x = "Timepoint"
+  ) +
+  theme_bw(base_size = 10) +
+  theme(
+    strip.text = element_text(face = "bold"),
+    legend.position = "right"
+  )
+
+```
+
+```{r}
+# Ensure correct timepoint order
+met$Timepoint <- factor(met$Timepoint, levels = c("rP", "tP", "rB", "tB"))
+
+# Run Wilcoxon test: rB vs tB for each metabolite
+sig_mets <- met %>%
+  filter(Timepoint %in% c("rB", "tB")) %>%
+  group_by(metabolite) %>%
+  summarise(p.value = tryCatch(
+    wilcox.test(value[Timepoint == "rB"], value[Timepoint == "tB"])$p.value,
+    error = function(e) NA_real_
+  )) %>%
+  filter(p.value < 0.05) %>%
+  pull(metabolite)
+
+# Subset met for significant metabolites only
+met_sig <- met %>%
+  filter(metabolite %in% sig_mets)
+
+met_comp <- met_sig %>% filter(Timepoint %in% c("rB", "tB"))
+
+ggplot(met_comp, aes(x = Timepoint, y = value, group = Subject.Number)) +
+  geom_line(alpha = 0.4) +
+  geom_point(aes(color = Timepoint), size = 2) +
+  facet_wrap(~ metabolite, scales = "free_y") +
+  scale_color_manual(values = c("rB" = "gold", "tB" = "purple")) +
+  labs(title = "Compliance Check: Metabolite Increase Post BRB",
+       y = "ng/mL") +
+  theme_bw(base_size = 11)
+
+```
+
+```{r}
+library(dplyr)
+library(purrr)
+
+# Filter only rB and tB
+met_rb_tb <- met %>%
+  filter(Timepoint %in% c("rB", "tB"))
+
+# Perform Wilcoxon test for each metabolite
+wilcox_rb_tb <- met_rb_tb %>%
+  group_by(metabolite) %>%
+  summarise(
+    p.value = wilcox.test(value ~ Timepoint)$p.value,
+    .groups = "drop"
+  ) %>%
+  mutate(p.adj = p.adjust(p.value, method = "BH"),
+         significant = ifelse(p.adj < 0.05, "yes", "no"))
+
+# View significant results
+wilcox_rb_tb %>% filter(significant == "yes")
+
+
+```
+
+```{r}
+# Get significant metabolite names
+sig_metabs <- wilcox_rb_tb %>%
+  filter(p.adj < 0.05) %>%
+  pull(metabolite)
+
+# Subset original data
+rb_tb_data <- met %>%
+  filter(Timepoint %in% c("rB", "tB"),
+         metabolite %in% sig_metabs)
+library(tidyr)
+
+rb_tb_wide <- rb_tb_data %>%
+  select(metabolite, Subject.Number, Timepoint, value) %>%
+  pivot_wider(names_from = Timepoint, values_from = value) %>%
+  mutate(change = tB - rB)
+```
+
+```{r}
+library(ggplot2)
+
+# Loop through each metabolite and plot the changes
+for (metab in unique(rb_tb_wide$metabolite)) {
+  p <- rb_tb_wide %>%
+    filter(metabolite == metab) %>%
+    ggplot(aes(x = factor(Subject.Number), y = change)) +
+    geom_col(fill = "steelblue") +
+    labs(title = paste("Change in", metab, "per participant"),
+         x = "Subject", y = "Change (tB - rB)") +
+    theme_minimal()
+
+  print(p)  # shows the plot if interactive
+  # Optionally save
+  ggsave(paste0("figures/", gsub(" ", "_", metab), "_barplot.png"), plot = p, width = 6, height = 4)
+}
+
+```
+
+```{r}
+my_colors <- c("#4E79A7", "#F28E2B", "#E15759", "#76B7B2", "#59A14F",
+               "#EDC948", "#B07AA1", "#FF9DA7", "#9C755F", "#BAB0AC")
+
+rb_tb_wide %>%
+  ggplot(aes(x = factor(Subject.Number), y = change, fill = factor(Subject.Number))) +
+  geom_col() +
+  facet_wrap(~ metabolite, scales = "free_y") +
+  scale_fill_manual(values = rep(my_colors, length.out = length(unique(rb_tb_wide$Subject.Number)))) +
+  labs(x = "Participant ID", y = "Change in Metabolite Concentration (ng/mL)") +
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle = 90, hjust = 1),
+        legend.position = "none")
+
+
+```
+
+```{r}
+# Step 1: Filter for rB and tB timepoints only
+met_rb_tb <- met_sig %>%
+  filter(Timepoint %in% c("rB", "tB"))
+
+# Step 2: Get one row per Subject.Number × metabolite with rB and tB
+met_diff <- met_rb_tb %>%
+  select(Subject.Number, metabolite, Timepoint, value) %>%
+  pivot_wider(names_from = Timepoint, values_from = value) %>%
+  filter(!is.na(rB) & !is.na(tB)) %>%  # Keep complete cases
+  mutate(change = tB - rB)
+
+# Step 3: Plot density
+ggplot(met_diff, aes(x = change)) +
+  geom_density(fill = "lightblue", alpha = 0.6) +
+  facet_wrap(~ metabolite, scales = "free") +
+  labs(x = "(ng/mL)") +
+  theme_bw(base_size = 11)
+
+
+```
+
+```{r}
+# Create matrix: rows = participants, columns = metabolites
+heat_data <- rb_tb_wide %>%
+  select(Subject.Number, metabolite, change) %>%
+  pivot_wider(names_from = metabolite, values_from = change) %>%
+  column_to_rownames("Subject.Number") %>%
+  as.matrix()
+
+pheatmap(
+  heat_data,
+  cluster_rows = TRUE,
+  cluster_cols = TRUE,
+  color = colorRampPalette(c("purple4", "white", "red2"))(100))
+
+
+```
+
+```{r}
+heat_data_sig <- rb_tb_wide %>%
+  filter(metabolite %in% sig_mets) %>%
+  select(Subject.Number, metabolite, change) %>%
+  pivot_wider(names_from = metabolite, values_from = change) %>%
+  column_to_rownames("Subject.Number") %>%
+  as.matrix()
+ # Perform hierarchical clustering on participants
+row_dist <- dist(heat_data_sig)
+row_clust <- hclust(row_dist)
+
+# Cut dendrogram into 3 clusters
+cluster_assignments <- cutree(row_clust, k = 3)
+
+# Create annotation dataframe
+compliance_cluster_df <- data.frame(
+  Subject.Number = rownames(heat_data_sig),
+  compliance_cluster = as.factor(cluster_assignments)
+)
+rownames(compliance_cluster_df) <- compliance_cluster_df$Subject.Number
+compliance_cluster_df <- compliance_cluster_df["compliance_cluster", drop = FALSE]
+library(pheatmap)
+
+pheatmap(
+  heat_data_sig,
+  annotation_row = compliance_cluster_df,
+  cluster_rows = TRUE,
+  cluster_cols = TRUE,  # cluster metabolites
+  color = colorRampPalette(c("blue", "white", "red"))(100))
+
+```
+
+```{r}
+# Cut into 3 clusters
+cluster_assignments <- cutree(row_clust, k = 3)
+
+# Merge clusters 1 and 2 into one group
+merged_clusters <- ifelse(cluster_assignments %in% c(1, 2), "Responder", "Non-responder")
+
+# Build new annotation dataframe
+compliance_cluster_df <- data.frame(BRB_response = merged_clusters)
+rownames(compliance_cluster_df) <- rownames(heat_data_sig)
+annotation_colors <- list(
+  BRB_response = c("Responder" = "skyblue", "Non-responder" = "gold")
+)
+pheatmap(
+  heat_data_sig,
+  annotation_row = compliance_cluster_df,
+  annotation_colors = annotation_colors,
+  cluster_rows = TRUE,
+  cluster_cols = TRUE,
+  color = colorRampPalette(c("purple4", "white", "red2"))(100))
+
+```
+
+```{r}
+cytokine_data <- read.csv("../data/derived/cytokines_avg-results.csv")
+
+cytokine_data <- cytokine_data %>%
+  separate(Sample, into = c("Subject.Number", "visit"), sep = "-", convert = TRUE) %>%
+  mutate(
+    Subject.Number = as.character(Subject.Number),
+    visit = paste0("V", visit)  # ✅ fixes the mismatch
+  )
+
+key.long <- key.long %>%
+  mutate(Subject.Number = as.character(Subject.Number))
+
+cytokine_data <- cytokine_data %>%
+  left_join(key.long, by = c("Subject.Number", "visit" = "v"))
+
+
+```
+
+```{r}
+cytokine_rb_tb <- cytokine_data %>%
+  filter(Timepoint %in% c("rB", "tB"))
+
+cytokine_wide <- cytokine_rb_tb %>%
+  select(Subject.Number, Timepoint, cytokine, avg.res) %>%
+  pivot_wider(names_from = Timepoint, values_from = avg.res) %>%
+  filter(!is.na(rB) & !is.na(tB)) %>%
+  mutate(change = tB - rB)
+
+compliance_cluster_df <- compliance_cluster_df %>%
+  rownames_to_column("Subject.Number")
+
+cytokine_join <- cytokine_wide %>%
+  inner_join(compliance_cluster_df, by = "Subject.Number")
+
+
+```
+
+```{r}
+library(pheatmap)
+
+cytokine_heat_data <- cytokine_join %>%
+  select(Subject.Number, cytokine, change) %>%
+  pivot_wider(names_from = cytokine, values_from = change) %>%
+  column_to_rownames("Subject.Number") %>%
+  as.matrix()
+
+annotation_df <- cytokine_join %>%
+  select(Subject.Number, BRB_response) %>%
+  distinct() %>%
+  column_to_rownames("Subject.Number")
+annotation_colors <- list(
+  BRB_response = c("Responder" = "skyblue", "Non-responder" = "gold")
+)
+
+pheatmap(
+  cytokine_heat_data,
+  annotation_row = annotation_df,
+  annotation_colors = annotation_colors,
+  cluster_rows = TRUE,
+  cluster_cols = TRUE,
+  color = colorRampPalette(c("purple4", "white", "red2"))(100),
+  fontsize_row = 8
+)
+
+
+```
+
+```{r}
+# Scale cytokine change matrix (column-wise z-score)
+cytokine_heat_data_scaled <- scale(cytokine_heat_data)
+
+# Replot with scaled values
+pheatmap(
+  cytokine_heat_data_scaled,
+  annotation_row = annotation_df,
+  annotation_colors = annotation_colors,
+  cluster_rows = TRUE,
+  cluster_cols = TRUE,
+  color = colorRampPalette(c("purple4", "white", "red2"))(100),
+    fontsize_row = 8
+)
+
+
+```
