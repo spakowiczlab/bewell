@@ -20,6 +20,20 @@ cytofile.1<- "../data/raw/cytokines/13-2_20211209_173456.csv"
 cytofile.2 <- "../data/raw/cytokines/New Batch 3_20211207_210206.csv"
 cytofile.3 <- "../data/raw/cytokines/Spakowicz CRP_20220329_170324.csv"
 cytofile.4 <- "../data/raw/cytokines/Spakowicz_12_20211221_191508.csv"
+
+il17f_data <- read_excel("../data/raw/cytokines/IL17F ELISA result (PI_Spakowicz).xlsx", skip = 23) %>%
+  select(`Spakowicz Plasma Sample ID`, `Conc. (pg/ml)*fold dilution`) %>%
+  rename(
+    Sample = `Spakowicz Plasma Sample ID`,
+    avg.res = `Conc. (pg/ml)*fold dilution`
+  ) %>%
+  mutate(Sample = gsub("Spakowicz Plasma Sample PT: ", "", Sample),
+         Sample = gsub("\\.1$", "", Sample)) %>%
+  mutate(cytokine = "IL.17F") %>%
+  select(Sample, cytokine, avg.res)
+
+
+
 ```
 
 ```{r}
@@ -213,7 +227,9 @@ res.good.4 <- res.tab4.box %>%
   mutate(cytokine = gsub("Comlement", "Complement", cytokine),
          avg.res = ifelse(is.nan(avg.res), 0, avg.res))
 
-avg.results.tab <- bind_rows(res.good.1, res.good.2, res.good.3, res.good.4)
+# Combine standard cytokine results with IL17F ELISA results
+avg.results.tab <- bind_rows(res.good.1, res.good.2, res.good.3, res.good.4, il17f_data) %>%
+  arrange(Sample, cytokine)
 ```
 
 ```{r}
