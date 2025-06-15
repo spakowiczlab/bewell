@@ -20,13 +20,13 @@ library(ggpubr)
 
 
 ```{r}
-cytokines <- read.csv("/Users/baileyconrad/Desktop/bewell/data/derived/cytokines_avg-results.csv")
-samplabs <- read.csv("/Users/baileyconrad/Desktop/bewell/data/derived/timepoint_key.csv")
+cytokines <- read.csv("../data/derived/cytokines_avg-results.csv")
+samplabs <- read.csv("../data/derived/timepoint_key.csv")
 ```
 
 Converting data into wide format from long format. 
 ```{r}
-cytokines %>% select(-X) %>% pivot_wider(names_from = cytokine, values_from = avg.res)
+cytokines %>% select(-X) %>% pivot_wider(names_from = cytokine, values_from = avg.res) ###???
 ```
 
 
@@ -50,7 +50,7 @@ cyto.form <- cytokines %>%
 ```
 
 ```{r}
-object <- c("ALCAM.CD166", "C.Reactive.Protein.CRP", "CCL2.JE.MCP.1", "Complement.Component.C9", "Cystatin.C", "IL.1.beta.IL.1F2", "IL.10", "IL.12.IL.23.p40", "IL.6", "MMP.2", "S100A9", "TNF.alpha", "vWF.A2")
+object <- c("ALCAM.CD166", "C.Reactive.Protein.CRP", "CCL2.JE.MCP.1", "Complement.Component.C9", "Cystatin.C", "IL.1.beta.IL.1F2", "IL.10", "IL.12.IL.23.p40", "IL.6", "MMP.2", "S100A9", "TNF.alpha", "vWF.A2", "IL.17F")
 
 capture.models.univ <- function(outcome, lfun, cytos, modin) {
   mods.list <- lapply(cytos, function(x)  try({glm(as.formula(paste0(outcome, " ~ ", x)), family = lfun, data = modin) %>% tidy()}))
@@ -104,5 +104,115 @@ ggsave("../figures/cytokine_effect-size_volcano-plot.png")
 # ggsave("../figures/effect-size_cytokines.png")
 ```
 
+```{r}
+cyto_prepost <- cyto.form %>%
+  filter(timepoint.label %in% c("preBRB", "postBRB"))
 
+#  Extract Subject.Number 
+cyto_clean <- cyto_prepost %>%
+  mutate(Subject.Number = sub("-.*", "", Sample))
+
+# Pivot longer so cytokines become rows
+cyto_long <- cyto_clean %>%
+  pivot_longer(
+    cols = ALCAM.CD166:vWF.A2,
+    names_to = "cytokine",
+    values_to = "value"
+  )
+
+# Pivot wider to get pre/post in columns
+cyto_wide <- cyto_long %>%
+  group_by(Subject.Number, cytokine, timepoint.label) %>%
+  summarise(value = mean(as.numeric(value), na.rm = TRUE), .groups = "drop") %>%
+  pivot_wider(
+    names_from = timepoint.label,
+    values_from = value
+  ) %>%
+  mutate(change = postBRB - preBRB)
+
+
+# Optional — wide matrix for heatmap
+cyto_heat_matrix <- cyto_wide %>%
+  select(Subject.Number, cytokine, change) %>%
+  pivot_wider(names_from = cytokine, values_from = change) %>%
+  column_to_rownames("Subject.Number") %>%
+  as.matrix()
+
+# Heatmap
+pheatmap::pheatmap(
+  cyto_heat_matrix,
+  cluster_rows = TRUE,
+  cluster_cols = TRUE,
+  color = colorRampPalette(c("blue", "white", "red"))(100),
+  main = "Cytokine Change (PostBRB - PreBRB)",
+  fontsize_row = 5
+
+)
+
+
+```
+
+```{r}
+compliance_cluster_df <- as.data.frame(compliance_cluster_df)
+
+common_ids <- intersect(rownames(cyto_heat_matrix), rownames(compliance_cluster_df))
+
+cyto_heat_matrix1 <- cyto_heat_matrix[common_ids, ]
+annotation_df <- compliance_cluster_df[common_ids, , drop = FALSE]
+
+pheatmap::pheatmap(
+  cyto_heat_matrix1,
+  cluster_rows = TRUE,
+  cluster_cols = TRUE,
+  color = colorRampPalette(c("blue", "white", "red"))(100),
+  main = "Cytokine Change (PostBRB - PreBRB)",
+  fontsize_row = 7
+)
+
+```
+```{r}
+cyto_heat <- cyto_wide %>%
+  select(Subject.Number, cytokine, change) %>%
+  pivot_wider(names_from = cytokine, values_from = change) %>%
+  column_to_rownames("Subject.Number") %>%
+  as.matrix()
+# Match only participants in both datasets:
+common_ids <- intersect(rownames(cyto_heat), rownames(compliance_cluster_df))
+cyto_heat_matched <- cyto_heat[common_ids, ]
+annotation_df <- compliance_cluster_df[common_ids, , drop = FALSE]
+
+annotation_colors <- list(
+  BRB_response = c("Responder" = "skyblue", "Non-responder" = "gold")
+)
+
+P<- pheatmap(
+  cyto_heat_matched,
+  annotation_row = annotation_df,
+  annotation_colors = annotation_colors,
+  cluster_rows = TRUE,
+  cluster_cols = TRUE,
+  color = colorRampPalette(c("blue", "white", "red"))(100),
+  fontsize_row = 7
+
+)
+ggsave("cytokine_heatmap_by BRB response.png",, width = 8, height = 6)
+
+
+```
+```{r}
+# Subset to only responders
+responder_ids <- rownames(annotation_df)[annotation_df$BRB_response == "Responder"]
+
+cyto_heat_responders <- cyto_heat_matched[responder_ids, ]
+annotation_responders <- annotation_df[responder_ids, , drop = FALSE]
+
+# Plot heatmap for responders only
+pheatmap(
+  cyto_heat_responders,
+  cluster_rows = TRUE,
+  cluster_cols = TRUE,
+  color = colorRampPalette(c("blue", "white", "red"))(100),
+  fontsize_row = 7)
+
+```
 

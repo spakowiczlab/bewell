@@ -133,9 +133,6 @@ ggplot(met_comp, aes(x = Timepoint, y = value, group = Subject.Number)) +
 ```
 
 ```{r}
-library(dplyr)
-library(purrr)
-
 # Filter only rB and tB
 met_rb_tb <- met %>%
   filter(Timepoint %in% c("rB", "tB"))
@@ -166,7 +163,6 @@ sig_metabs <- wilcox_rb_tb %>%
 rb_tb_data <- met %>%
   filter(Timepoint %in% c("rB", "tB"),
          metabolite %in% sig_metabs)
-library(tidyr)
 
 rb_tb_wide <- rb_tb_data %>%
   select(metabolite, Subject.Number, Timepoint, value) %>%
@@ -175,8 +171,6 @@ rb_tb_wide <- rb_tb_data %>%
 ```
 
 ```{r}
-library(ggplot2)
-
 # Loop through each metabolite and plot the changes
 for (metab in unique(rb_tb_wide$metabolite)) {
   p <- rb_tb_wide %>%
@@ -212,18 +206,18 @@ rb_tb_wide %>%
 ```
 
 ```{r}
-# Step 1: Filter for rB and tB timepoints only
+# Filter for rB and tB timepoints only
 met_rb_tb <- met_sig %>%
   filter(Timepoint %in% c("rB", "tB"))
 
-# Step 2: Get one row per Subject.Number × metabolite with rB and tB
+# Get one row per Subject.Number × metabolite with rB and tB
 met_diff <- met_rb_tb %>%
   select(Subject.Number, metabolite, Timepoint, value) %>%
   pivot_wider(names_from = Timepoint, values_from = value) %>%
   filter(!is.na(rB) & !is.na(tB)) %>%  # Keep complete cases
   mutate(change = tB - rB)
 
-# Step 3: Plot density
+# Plot density
 ggplot(met_diff, aes(x = change)) +
   geom_density(fill = "lightblue", alpha = 0.6) +
   facet_wrap(~ metabolite, scales = "free") +
@@ -305,88 +299,3 @@ pheatmap(
 
 ```
 
-```{r}
-cytokine_data <- read.csv("../data/derived/cytokines_avg-results.csv")
-
-cytokine_data <- cytokine_data %>%
-  separate(Sample, into = c("Subject.Number", "visit"), sep = "-", convert = TRUE) %>%
-  mutate(
-    Subject.Number = as.character(Subject.Number),
-    visit = paste0("V", visit)  # ✅ fixes the mismatch
-  )
-
-key.long <- key.long %>%
-  mutate(Subject.Number = as.character(Subject.Number))
-
-cytokine_data <- cytokine_data %>%
-  left_join(key.long, by = c("Subject.Number", "visit" = "v"))
-
-
-```
-
-```{r}
-cytokine_rb_tb <- cytokine_data %>%
-  filter(Timepoint %in% c("rB", "tB"))
-
-cytokine_wide <- cytokine_rb_tb %>%
-  select(Subject.Number, Timepoint, cytokine, avg.res) %>%
-  pivot_wider(names_from = Timepoint, values_from = avg.res) %>%
-  filter(!is.na(rB) & !is.na(tB)) %>%
-  mutate(change = tB - rB)
-
-compliance_cluster_df <- compliance_cluster_df %>%
-  rownames_to_column("Subject.Number")
-
-cytokine_join <- cytokine_wide %>%
-  inner_join(compliance_cluster_df, by = "Subject.Number")
-
-
-```
-
-```{r}
-library(pheatmap)
-
-cytokine_heat_data <- cytokine_join %>%
-  select(Subject.Number, cytokine, change) %>%
-  pivot_wider(names_from = cytokine, values_from = change) %>%
-  column_to_rownames("Subject.Number") %>%
-  as.matrix()
-
-annotation_df <- cytokine_join %>%
-  select(Subject.Number, BRB_response) %>%
-  distinct() %>%
-  column_to_rownames("Subject.Number")
-annotation_colors <- list(
-  BRB_response = c("Responder" = "skyblue", "Non-responder" = "gold")
-)
-
-pheatmap(
-  cytokine_heat_data,
-  annotation_row = annotation_df,
-  annotation_colors = annotation_colors,
-  cluster_rows = TRUE,
-  cluster_cols = TRUE,
-  color = colorRampPalette(c("purple4", "white", "red2"))(100),
-  fontsize_row = 8
-)
-
-
-```
-
-```{r}
-# Scale cytokine change matrix (column-wise z-score)
-cytokine_heat_data_scaled <- scale(cytokine_heat_data)
-
-# Replot with scaled values
-pheatmap(
-  cytokine_heat_data_scaled,
-  annotation_row = annotation_df,
-  annotation_colors = annotation_colors,
-  cluster_rows = TRUE,
-  cluster_cols = TRUE,
-  color = colorRampPalette(c("purple4", "white", "red2"))(100),
-    fontsize_row = 8
-)
-
-
-```
