@@ -16,6 +16,9 @@ library(ggrepel)
 library(ggtext)
 library(ggplot2)
 library(ggpubr)
+library(lme4)
+library(broom.mixed)
+library(dplyr)
 ```
 
 
@@ -104,115 +107,114 @@ ggsave("../figures/cytokine_effect-size_volcano-plot.png")
 # ggsave("../figures/effect-size_cytokines.png")
 ```
 
+#SJ
+## mixed-effects model
 ```{r}
-cyto_prepost <- cyto.form %>%
-  filter(timepoint.label %in% c("preBRB", "postBRB"))
+cyto_model_data <- cyto.form %>%
+  filter(timepoint.label %in% c("preBRB", "postBRB")) %>%
+  mutate(pt = sub("-.*", "", Sample))  # Extracts Subject.Number
 
-#  Extract Subject.Number 
-cyto_clean <- cyto_prepost %>%
-  mutate(Subject.Number = sub("-.*", "", Sample))
+run_mixed_model <- function(cytokine_name, data) {
+  formula <- as.formula(paste0("berry.group ~ ", cytokine_name, " + (1 | pt)"))
+  model <- glmer(formula, data = data, family = binomial)
+  return(tidy(model))
+}
 
-# Pivot longer so cytokines become rows
-cyto_long <- cyto_clean %>%
-  pivot_longer(
-    cols = ALCAM.CD166:vWF.A2,
-    names_to = "cytokine",
-    values_to = "value"
+# Apply to all cytokines
+cyto_mixed_results_all <- lapply(object, function(cyt) {
+  res <- tryCatch(run_mixed_model(cyt, cyto_model_data), error = function(e) NULL)
+  if (!is.null(res)) res$cytokine <- cyt
+  return(res)
+}) %>%
+  bind_rows()
+
+
+cyto_effects_all <- cyto_mixed_results_all %>%
+  filter(!(term %in% c("(Intercept)", "sd__(Intercept)")))
+
+
+```
+
+```{r}
+cyto_effects_all <- cyto_mixed_results_all %>%
+  filter(!(term %in% c("(Intercept)", "sd__(Intercept)"))) %>%
+  select(cytokine, estimate, std.error, statistic, p.value) %>%
+  arrange(p.value)
+
+```
+
+```{r}
+cyto_effects_all %>%
+  mutate(label = ifelse(-log10(p.value) > 0.5, cytokine, NA)) %>%
+  ggplot(aes(x = estimate, y = -log10(p.value), label = label)) +
+  geom_point(aes(color = estimate)) +
+  geom_hline(yintercept = 0.5, linetype = "dashed") +
+  geom_label_repel() +
+  theme_bw(base_size = 14) +
+  labs(
+    x = "Log-odds estimate (Effect Size)",
+    y = "-log10(p-value)",
+    title = "Volcano Plot of Cytokine Effects (Mixed Model)"
   )
 
-# Pivot wider to get pre/post in columns
-cyto_wide <- cyto_long %>%
-  group_by(Subject.Number, cytokine, timepoint.label) %>%
-  summarise(value = mean(as.numeric(value), na.rm = TRUE), .groups = "drop") %>%
-  pivot_wider(
-    names_from = timepoint.label,
-    values_from = value
-  ) %>%
-  mutate(change = postBRB - preBRB)
+```
 
-
-# Optional — wide matrix for heatmap
-cyto_heat_matrix <- cyto_wide %>%
-  select(Subject.Number, cytokine, change) %>%
-  pivot_wider(names_from = cytokine, values_from = change) %>%
-  column_to_rownames("Subject.Number") %>%
-  as.matrix()
-
-# Heatmap
-pheatmap::pheatmap(
-  cyto_heat_matrix,
-  cluster_rows = TRUE,
-  cluster_cols = TRUE,
-  color = colorRampPalette(c("blue", "white", "red"))(100),
-  main = "Cytokine Change (PostBRB - PreBRB)",
-  fontsize_row = 5
-
-)
+```{r}
+cyto_effects_all %>%
+  mutate(label = cytokine) %>%
+  ggplot(aes(x = estimate, y = -log10(p.value), label = label)) +
+  geom_point(aes(color = estimate)) +
+  geom_label_repel() +
+  geom_hline(yintercept = 0.5, linetype = "dashed") +
+  theme_bw(base_size = 14) +
+  labs(
+    x = "Effect Size (estimate)",
+    y = "-log10(p-value)")
 
 
 ```
 
 ```{r}
+cyto_model_data <- cyto.form %>%
+  filter(timepoint.label %in% c("preBRB", "postBRB")) %>%
+  mutate(pt = sub("-.*", "", Sample),
+         pt = as.factor(pt))  # Ensure pt is a factor
+
+
 compliance_cluster_df <- as.data.frame(compliance_cluster_df)
+compliance_cluster_df$pt <- rownames(compliance_cluster_df)
 
-common_ids <- intersect(rownames(cyto_heat_matrix), rownames(compliance_cluster_df))
+# Get responder IDs
+responder_ids <- rownames(compliance_cluster_df[compliance_cluster_df$BRB_response == "Responder", ])
 
-cyto_heat_matrix1 <- cyto_heat_matrix[common_ids, ]
-annotation_df <- compliance_cluster_df[common_ids, , drop = FALSE]
+# Subset modeling data to responders only
+cyto_model_data_responder <- cyto_model_data %>%
+  filter(pt %in% responder_ids)
 
-pheatmap::pheatmap(
-  cyto_heat_matrix1,
-  cluster_rows = TRUE,
-  cluster_cols = TRUE,
-  color = colorRampPalette(c("blue", "white", "red"))(100),
-  main = "Cytokine Change (PostBRB - PreBRB)",
-  fontsize_row = 7
-)
-
-```
-```{r}
-cyto_heat <- cyto_wide %>%
-  select(Subject.Number, cytokine, change) %>%
-  pivot_wider(names_from = cytokine, values_from = change) %>%
-  column_to_rownames("Subject.Number") %>%
-  as.matrix()
-# Match only participants in both datasets:
-common_ids <- intersect(rownames(cyto_heat), rownames(compliance_cluster_df))
-cyto_heat_matched <- cyto_heat[common_ids, ]
-annotation_df <- compliance_cluster_df[common_ids, , drop = FALSE]
-
-annotation_colors <- list(
-  BRB_response = c("Responder" = "skyblue", "Non-responder" = "gold")
-)
-
-P<- pheatmap(
-  cyto_heat_matched,
-  annotation_row = annotation_df,
-  annotation_colors = annotation_colors,
-  cluster_rows = TRUE,
-  cluster_cols = TRUE,
-  color = colorRampPalette(c("blue", "white", "red"))(100),
-  fontsize_row = 7
-
-)
-ggsave("cytokine_heatmap_by BRB response.png",, width = 8, height = 6)
+# Apply mixed model to responder subset
+cyto_mixed_results_responders <- lapply(object, function(cyt) {
+  run_mixed_model(cyt, cyto_model_data_responder)
+}) %>% bind_rows(.id = "cytokine_index")
 
 
 ```
+
 ```{r}
-# Subset to only responders
-responder_ids <- rownames(annotation_df)[annotation_df$BRB_response == "Responder"]
+cyto_effects_responders <- cyto_mixed_results_responders %>%
+  filter(!(term %in% c("(Intercept)", "sd__(Intercept)"))) %>%
+  rename(cytokine = term) %>%
+  select(cytokine, estimate, std.error, statistic, p.value) %>%
+  arrange(p.value)
 
-cyto_heat_responders <- cyto_heat_matched[responder_ids, ]
-annotation_responders <- annotation_df[responder_ids, , drop = FALSE]
-
-# Plot heatmap for responders only
-pheatmap(
-  cyto_heat_responders,
-  cluster_rows = TRUE,
-  cluster_cols = TRUE,
-  color = colorRampPalette(c("blue", "white", "red"))(100),
-  fontsize_row = 7)
+ggplot(cyto_effects_responders, aes(x = estimate, y = -log10(p.value), label = cytokine)) +
+  geom_point(aes(color = estimate)) +
+  geom_hline(yintercept = -log10(0.05), linetype = "dashed") +
+  geom_label_repel(data = subset(cyto_effects_responders, -log10(p.value) > 0.5)) +
+  scale_color_gradient2(low = "blue", mid = "white", high = "red", midpoint = 0) +
+  theme_bw(base_size = 14) +
+  labs(
+    x = "Effect Size (estimate)",
+    y = "-log10(p-value)")
 
 ```
 

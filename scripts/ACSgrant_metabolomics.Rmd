@@ -71,7 +71,7 @@ met %>%
 ggsave("../figures/metabolomics_boxplot.png", dev="png", height = 6, width = 5, dpi = 400)
 ```
 
-### author: "SJ"
+# SJ
 
 ```{r}
 # Rename levels for legend clarity
@@ -182,7 +182,6 @@ for (metab in unique(rb_tb_wide$metabolite)) {
     theme_minimal()
 
   print(p)  # shows the plot if interactive
-  # Optionally save
   ggsave(paste0("figures/", gsub(" ", "_", metab), "_barplot.png"), plot = p, width = 6, height = 4)
 }
 
@@ -251,7 +250,8 @@ heat_data_sig <- rb_tb_wide %>%
   pivot_wider(names_from = metabolite, values_from = change) %>%
   column_to_rownames("Subject.Number") %>%
   as.matrix()
- # Perform hierarchical clustering on participants
+
+# Perform hierarchical clustering on participants
 row_dist <- dist(heat_data_sig)
 row_clust <- hclust(row_dist)
 
