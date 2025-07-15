@@ -11,6 +11,8 @@ knitr::opts_chunk$set(echo = TRUE)
 library(tidyverse)
 library(readxl)
 library(pheatmap)
+library(grid)
+library(svglite)
 
 ```
 
@@ -97,6 +99,93 @@ ggplot(met_brb, aes(x = Timepoint, y = value, group = Subject.Number)) +
     strip.text = element_text(face = "bold"),
     legend.position = "right"
   )
+
+```
+## all metabolites
+```{r}
+rb_tb_wide_all <- met %>%
+  filter(Timepoint %in% c("rB", "tB")) %>%
+  select(metabolite, Subject.Number, Timepoint, value) %>%
+  pivot_wider(names_from = Timepoint, values_from = value) %>%
+  mutate(change = tB - rB)
+
+heat_data_all <- rb_tb_wide_all %>%
+  select(Subject.Number, metabolite, change) %>%
+  pivot_wider(names_from = metabolite, values_from = change) %>%
+  column_to_rownames("Subject.Number") %>%
+  as.matrix()
+
+pheatmap(
+  heat_data_all,
+  cluster_rows = TRUE,
+  cluster_cols = TRUE,
+  color = colorRampPalette(c("red2", "white", "purple4"))(100))
+
+```
+```{r}
+# Z-score transform each metabolite (column)
+heat_data_z <- t(scale(t(heat_data_all)))  # Rows = participants, Columns = metabolites
+
+pheatmap(
+  heat_data_z,
+  cluster_rows = TRUE,
+  cluster_cols = TRUE,
+  color = colorRampPalette(c("red3", "white", "purple4"))(100))
+
+ggsave("../figures/metabolomics_heatmap.svg",
+       height = 4, width = 6)
+
+
+```
+```{r}
+# Create the heatmap and store it
+p <- pheatmap(
+  heat_data_z,
+  cluster_rows = TRUE,
+  cluster_cols = TRUE,
+  color = colorRampPalette(c("red3", "white", "purple4"))(100),
+  silent = TRUE  # Prevents automatic plotting so we can capture it
+)
+
+# Open SVG device
+svglite::svglite("../figures/metabolomics_heatmap.svg", height = 4, width = 6)
+
+# Draw the saved gtable to the device
+grid::grid.draw(p$gtable)
+
+# Close device
+dev.off()
+
+```
+
+```{r}
+# Pick one non-significant metabolite
+no_change_met <- wilcox_rb_tb %>%
+  filter(p.adj > 0.5) %>%
+  filter(metabolite %in% unique(met$metabolite)) %>%
+  filter(!metabolite %in% c("cy rut", "cyxyrut")) %>%
+  slice(1) %>%
+  pull(metabolite)
+
+# Set desired facet order
+met_order <- c("cy rut", "cy xyrut", no_change_met)
+
+# Plot
+met %>%
+  filter(Timepoint %in% c("rB", "tB"),
+         metabolite %in% met_order) %>%
+  mutate(
+    Timepoint = recode(Timepoint, "rB" = "Pre-BRB", "tB" = "Post-BRB"),
+    metabolite = factor(metabolite, levels = met_order)  # enforce facet order
+  ) %>%
+  ggplot(aes(x = Timepoint, y = value)) +
+  geom_boxplot(fill = "lightblue", outlier.shape = NA) +
+  geom_jitter(width = 0.2, size = 1.5, alpha = 0.6) +  # show individual points
+  facet_wrap(~ metabolite, scales = "free_y") +
+  labs(x = "Timepoint", y = "ng/mL") +
+  theme_bw(base_size = 11)
+
+ggsave("../figures/metabolomics_3boxplot.svg", height = 4, width = 6, dpi = 400)
 
 ```
 
