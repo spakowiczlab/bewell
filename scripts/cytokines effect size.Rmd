@@ -173,6 +173,16 @@ cyto_effects_all %>%
 
 
 ```
+```{r}
+cytokine_change_df <- cyto.form %>%
+  filter(timepoint.label %in% c("preBRB", "postBRB")) %>%
+  mutate(Subject.Number = sub("-.*", "", Sample)) %>%
+  select(Subject.Number, timepoint.label, all_of(object)) %>%
+  pivot_wider(names_from = timepoint.label, values_from = all_of(object))
+
+
+```
+
 
 ```{r}
 cyto_model_data <- cyto.form %>%
@@ -217,4 +227,112 @@ ggplot(cyto_effects_responders, aes(x = estimate, y = -log10(p.value), label = c
     y = "-log10(p-value)")
 
 ```
+
+```{r}
+cyto_prepost <- cyto.form %>% filter(timepoint.label %in% c("preBRB", "postBRB"))
+# Step 1: Extract Subject.Number (e.g., 57 from "57-1")
+cyto_clean <- cyto_prepost %>% mutate(Subject.Number = sub("-.*", "", Sample))
+
+# Step 2: Pivot longer so cytokines become rows 
+cyto_long <- cyto_clean %>% pivot_longer( cols = ALCAM.CD166:vWF.A2, names_to = "cytokine", values_to = "value" )
+
+# Step 3: Pivot wider to get pre/post in columns
+cyto_wide <- cyto_long %>%
+  group_by(Subject.Number, cytokine, timepoint.label) %>%
+  summarise(value = mean(as.numeric(value), na.rm = TRUE), .groups = "drop") %>%
+  pivot_wider(
+    names_from = timepoint.label,
+    values_from = value
+  ) %>%
+  mutate(change = postBRB - preBRB)
+
+cyto_heat <- cyto_wide %>%
+  select(Subject.Number, cytokine, change) %>%
+  pivot_wider(names_from = cytokine, values_from = change) %>%
+  column_to_rownames("Subject.Number") %>%
+  as.matrix()
+
+pheatmap(
+  cyto_heat,
+  annotation_colors = annotation_colors,
+  cluster_rows = TRUE,
+  cluster_cols = TRUE,
+  color = colorRampPalette(c("blue", "white", "red"))(100),
+  main = "Cytokine Change (PostBRB - PreBRB)",
+  fontsize_row = 5
+)
+
+```
+```{r}
+#Z-score
+
+cyto_heat_scaled <- scale(cyto_heat)
+
+pheatmap(
+  cyto_heat_scaled,
+  annotation_colors = annotation_colors,
+  cluster_rows = TRUE,
+  cluster_cols = TRUE,
+  color = colorRampPalette(c("red2", "white", "purple4"))(100),
+  fontsize_row = 5
+)
+
+ggsave("../figures/heatmap_cytokines.svg")
+
+
+
+```
+
+```{r}
+svg("../figures/heatmap_cytokines.svg", width = 6, height = 5)  
+pheatmap(
+  cyto_heat_scaled,
+  annotation_colors = annotation_colors,
+  cluster_rows = TRUE,
+  cluster_cols = TRUE,
+  color = colorRampPalette(c("red2", "white", "purple4"))(100),
+  fontsize_row = 5
+)
+dev.off()
+
+```
+
+```{r}
+# Highest effect size (change)
+top_cytos <- cyto_effects_all %>%
+  arrange(p.value) %>%
+  slice(1:2) %>%  # top 2 changing cytokines
+  pull(cytokine)
+
+# One non-significant cytokine
+no_change_cyto <- cyto_effects_all %>%
+  filter(p.value > 0.5, !(cytokine %in% top_cytos)) %>%
+  slice(1) %>%
+  pull(cytokine)
+
+cyto_order <- c(top_cytos, no_change_cyto)
+
+# Step 2: Prepare data
+cyto_box_data <- cyto_long %>%
+  filter(cytokine %in% cyto_order) %>%
+  mutate(
+    cytokine = factor(cytokine, levels = cyto_order),
+    Timepoint = recode(timepoint.label, "preBRB" = "Pre-BRB", "postBRB" = "Post-BRB")
+  )
+
+# Step 3: Plot
+ggplot(cyto_box_data, aes(x = Timepoint, y = value)) +
+  geom_boxplot(fill = "lightblue", outlier.shape = NA) +
+  geom_jitter(width = 0.2, size = 1.5, alpha = 0.6) +
+  facet_wrap(~ cytokine, scales = "free_y") +
+  labs(x = "Timepoint", y = "Cytokine level (ng/mL)") +
+  theme_bw(base_size = 11)
+
+# Step 4: Save
+ggsave("../figures/cytokines_3boxplot.svg", height = 4, width = 6, dpi = 400)
+
+
+```
+
+
 
