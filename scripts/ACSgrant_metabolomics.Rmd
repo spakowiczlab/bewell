@@ -13,7 +13,7 @@ library(readxl)
 library(pheatmap)
 library(grid)
 library(svglite)
-
+library(ggpubr)
 ```
 
 read in data
@@ -122,21 +122,26 @@ pheatmap(
   color = colorRampPalette(c("red2", "white", "purple4"))(100))
 
 ```
+
 ```{r}
 # Z-score transform each metabolite (column)
 heat_data_z <- t(scale(t(heat_data_all)))  # Rows = participants, Columns = metabolites
 
-pheatmap(
+library(gridExtra)
+
+ph <- pheatmap(
   heat_data_z,
   cluster_rows = TRUE,
   cluster_cols = TRUE,
-  color = colorRampPalette(c("red3", "white", "purple4"))(100))
+  color = colorRampPalette(c("red3", "white", "purple4"))(100),
+  labels_row = rep("", nrow(heat_data_z))   # remove IDs
+)
 
-ggsave("../figures/metabolomics_heatmap.svg",
-       height = 4, width = 6)
+ggsave("../figures/metabolomics_heatmap.svg", ph, width = 6, height = 4)
 
 
 ```
+
 ```{r}
 # Create the heatmap and store it
 p <- pheatmap(
@@ -158,36 +163,7 @@ dev.off()
 
 ```
 
-```{r}
-# Pick one non-significant metabolite
-no_change_met <- wilcox_rb_tb %>%
-  filter(p.adj > 0.5) %>%
-  filter(metabolite %in% unique(met$metabolite)) %>%
-  filter(!metabolite %in% c("cy rut", "cyxyrut")) %>%
-  slice(1) %>%
-  pull(metabolite)
 
-# Set desired facet order
-met_order <- c("cy rut", "cy xyrut", no_change_met)
-
-# Plot
-met %>%
-  filter(Timepoint %in% c("rB", "tB"),
-         metabolite %in% met_order) %>%
-  mutate(
-    Timepoint = recode(Timepoint, "rB" = "Pre-BRB", "tB" = "Post-BRB"),
-    metabolite = factor(metabolite, levels = met_order)  # enforce facet order
-  ) %>%
-  ggplot(aes(x = Timepoint, y = value)) +
-  geom_boxplot(fill = "lightblue", outlier.shape = NA) +
-  geom_jitter(width = 0.2, size = 1.5, alpha = 0.6) +  # show individual points
-  facet_wrap(~ metabolite, scales = "free_y") +
-  labs(x = "Timepoint", y = "ng/mL") +
-  theme_bw(base_size = 11)
-
-ggsave("../figures/metabolomics_3boxplot.svg", height = 4, width = 6, dpi = 400)
-
-```
 
 ```{r}
 # Ensure correct timepoint order
@@ -387,4 +363,100 @@ pheatmap(
   color = colorRampPalette(c("purple4", "white", "red2"))(100))
 
 ```
+```{r}
+write.csv(
+  compliance_cluster_df,
+  file = "../data/compliance_cluster_df.csv")
+```
+
+```{r}
+# Pick one non-significant metabolite
+no_change_met <- wilcox_rb_tb %>%
+  filter(p.adj > 0.5) %>%
+  filter(metabolite %in% unique(met$metabolite)) %>%
+  filter(!metabolite %in% c("cy rut", "cyxyrut")) %>%
+  slice(1) %>%
+  pull(metabolite)
+
+# Set desired facet order
+met_order <- c("cy rut", "cy xyrut", no_change_met)
+
+# Plot
+met %>%
+  filter(Timepoint %in% c("rB", "tB"),
+         metabolite %in% met_order) %>%
+  mutate(
+    Timepoint = recode(Timepoint, "rB" = "Pre-BRB", "tB" = "Post-BRB"),
+    metabolite = factor(metabolite, levels = met_order)  # enforce facet order
+  ) %>%
+  ggplot(aes(x = Timepoint, y = value)) +
+  geom_boxplot(fill = "lightblue", outlier.shape = NA) +
+  geom_jitter(width = 0.2, size = 1.5, alpha = 0.6) +  # show individual points
+  facet_wrap(~ metabolite, scales = "free_y") +
+  labs(x = "", y = "ng/mL") +
+  theme_bw(base_size = 9)
+
+ggsave("../figures/metabolomics_3boxplot.svg", height = 4, width = 6)
+
+```
+
+```{r}
+# Define comparisons (Pre-BRB vs Post-BRB for each metabolite)
+comparisons <- list(c("Pre-BRB", "Post-BRB"))
+
+met %>%
+  filter(Timepoint %in% c("rB", "tB"),
+         metabolite %in% met_order) %>%
+  mutate(
+    Timepoint = recode(Timepoint, "rB" = "Pre-BRB", "tB" = "Post-BRB"),
+    metabolite = factor(metabolite, levels = met_order)
+  ) %>%
+  ggplot(aes(x = Timepoint, y = value)) +
+  geom_boxplot(fill = "lightblue", outlier.shape = NA) +
+  geom_jitter(width = 0.2, size = 1.5, alpha = 0.6) +
+  facet_wrap(~ metabolite, scales = "free_y") +
+  labs(x = "", y = "(ng/mL)") +
+  theme_bw(base_size = 15) +
+  theme(axis.text.x = element_text(angle = 20, hjust = 1)) +
+  stat_compare_means(
+    comparisons = comparisons, 
+    method = "wilcox.test", 
+    label = "p.signif"     # <-- asterisks instead of raw p-values
+  )
+
+ggsave("../figures/metabolomics_3boxplot1.svg", height = 4, width = 6)
+
+```
+
+```{r}
+comparisons <- list(c("Pre-BRB", "Post-BRB"),c("Pre-Placebo", "Post-Placebo"))
+
+met %>%
+  filter(Timepoint %in% c("rB", "tB", "rP", "tP"),
+         metabolite %in% met_order) %>%
+  mutate(
+    Timepoint = recode(Timepoint,
+                       "rB" = "Pre-BRB",  "tB" = "Post-BRB",
+                       "rP" = "Pre-Placebo", "tP" = "Post-Placebo"),
+    Timepoint = factor(Timepoint,
+                       levels = c("Pre-Placebo","Post-Placebo","Pre-BRB","Post-BRB")),
+    metabolite = factor(metabolite, levels = met_order)
+  ) %>%
+  ggplot(aes(x = Timepoint, y = value)) +
+  geom_boxplot(fill = "lightblue", outlier.shape = NA) +
+  geom_jitter(width = 0.2, size = 1.5, alpha = 0.6) +
+  facet_wrap(~ metabolite, scales = "free_y") +
+  labs(x = "", y = "(ng/mL)") +
+  theme_bw(base_size = 15) +
+  theme(axis.text.x = element_text(angle = 20, hjust = 1))+
+  stat_compare_means(
+  comparisons = comparisons,
+  method = "wilcox.test",
+  method.args = list(paired = TRUE),
+  label = "p.signif"
+)
+ggsave("../figures/metabolomics_3boxplot1.svg", height = 4, width = 6)
+
+```
+
 

@@ -150,12 +150,13 @@ cyto_effects_all %>%
   geom_point(aes(color = estimate)) +
   geom_hline(yintercept = 0.5, linetype = "dashed") +
   geom_label_repel() +
-  theme_bw(base_size = 14) +
+  theme_bw(base_size = 16) +
   labs(
     x = "Log-odds estimate (Effect Size)",
     y = "-log10(p-value)",
     title = "Volcano Plot of Cytokine Effects (Mixed Model)"
   )
+ggsave("../figures/volcano_all_cytokines.svg")
 
 ```
 
@@ -164,12 +165,19 @@ cyto_effects_all %>%
   mutate(label = cytokine) %>%
   ggplot(aes(x = estimate, y = -log10(p.value), label = label)) +
   geom_point(aes(color = estimate)) +
-  geom_label_repel() +
+  geom_label_repel(size = 5,   # increase only annotation label text size
+                   box.padding = 0.4, 
+                   max.overlaps = Inf) +
   geom_hline(yintercept = 0.5, linetype = "dashed") +
-  theme_bw(base_size = 14) +
+  theme_bw(base_size = 16) +   # keep normal base size for axes/legend
   labs(
     x = "Effect Size (estimate)",
-    y = "-log10(p-value)")
+    y = "-log10(p-value)"
+  )
+
+
+ggsave("../figures/volcano_all_cytokines.svg")
+
 
 
 ```
@@ -221,10 +229,12 @@ ggplot(cyto_effects_responders, aes(x = estimate, y = -log10(p.value), label = c
   geom_hline(yintercept = -log10(0.05), linetype = "dashed") +
   geom_label_repel(data = subset(cyto_effects_responders, -log10(p.value) > 0.5)) +
   scale_color_gradient2(low = "blue", mid = "white", high = "red", midpoint = 0) +
-  theme_bw(base_size = 14) +
+  theme_bw(base_size = 18) +
   labs(
     x = "Effect Size (estimate)",
     y = "-log10(p-value)")
+ggsave("../figures/volcano_cytokines.svg")
+
 
 ```
 
@@ -264,20 +274,24 @@ pheatmap(
 
 ```
 ```{r}
-#Z-score
-
+# Z-score
 cyto_heat_scaled <- scale(cyto_heat)
 
-pheatmap(
+# Create heatmap object silently
+ph1 <- pheatmap(
   cyto_heat_scaled,
   annotation_colors = annotation_colors,
   cluster_rows = TRUE,
   cluster_cols = TRUE,
   color = colorRampPalette(c("navyblue", "white", "orange2"))(100),
-  fontsize_row = 5
+  labels_row = rep("", nrow(cyto_heat_scaled)),
+  silent = TRUE
 )
 
-ggsave("../figures/heatmap_cytokines.svg")
+# Save as SVG using svglite
+svglite::svglite("../figures/heatmap_cytokines.svg", width = 6, height = 5)
+grid::grid.draw(ph1$gtable)
+dev.off()
 
 
 
@@ -367,11 +381,11 @@ cyto_box_data <- cyto.form %>%
 # Boxplots
 ggplot(cyto_box_data, aes(x = Timepoint, y = value)) +
   geom_boxplot(fill = "cyan4", outlier.shape = NA) +
-  geom_jitter(width = 0.2, size = 1.5, alpha = 0.6) +
+  geom_jitter(width = 0.1, size = 0.5, alpha = 0.6) +
   facet_wrap(~ cytokine, scales = "free_y") +
   labs(x = "Timepoint", y = "Cytokine level (ng/mL)") +
-  theme_bw(base_size = 11) +
-  theme(axis.text.x = element_text(angle = 20, hjust = 1)) +
+  theme_bw(base_size =15) +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1)) +
   stat_compare_means(
   comparisons = comparisons,
   method = "wilcox.test",
@@ -379,7 +393,7 @@ ggplot(cyto_box_data, aes(x = Timepoint, y = value)) +
   label = "p.signif"
 )
 
-ggsave("../figures/cytokines_4groups_boxplot.svg", height = 4, width = 7, dpi = 400)
+ggsave("../figures/cytokines_4groups_boxplot.svg", height = 5, width = 7, dpi = 400)
 
 ```
 

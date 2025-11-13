@@ -1,0 +1,117 @@
+---
+title: "Metagenomics-based adherence"
+author: "Shiva Jahanbakhshi"
+date: "2025-11-04"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r}
+library(dplyr)
+library(ggplot2)
+library(readr)
+library(tidyverse)
+library(ggpubr)
+```
+
+```{r}
+meta <- read.csv("../data/derived/bewell_taxonomy_relAbun.csv")
+ros <- read_tsv("../data/Rosaceae_summary.tsv")
+BRB_species_results <- read_tsv("../data/BRB_species_results.tsv")
+compliance_cluster_df <- read_csv("../data/compliance_cluster_df.csv")
+```
+
+```{r}
+df <- ros %>%
+  inner_join(meta %>% select(sample, variable, id), by = "sample") %>%
+  mutate(variable = factor(variable, levels = c("rP","tP","rB","tB")))
+
+group_colors <- c(
+  rP = "#009E73",
+  tP = "#F0E442",
+  rB = "#56B4E9",
+  tB = "#E69F00"  
+)
+
+ggplot(df, aes(x = variable, y = percent_Rosaceae, fill = variable)) +
+  geom_boxplot(outlier.shape = NA) +
+  geom_jitter(width = 0.1, size = 1.4, alpha = 0.7) +
+  scale_fill_manual(values = group_colors) +
+  labs(
+    x = "",
+    y = "Rosaceae (% of reads)"
+  ) +
+  theme_classic(base_size = 14) +
+  theme(legend.position = "none")
+
+```
+
+```{r}
+
+dat <- meta %>%
+  select(id, sample, variable) %>%
+  inner_join(BRB_species_results %>% select(sample, percent, taxReads),
+             by = "sample") %>%
+  filter(variable %in% c("rP","tP","rB","tB")) %>%
+  mutate(variable = factor(variable, levels = c("rP","tP","rB","tB")))
+
+cols <- c(
+  rP = "#009E73",  
+  tP = "#F0E442",
+  rB = "#56B4E9", 
+  tB = "#E69F00"  
+)
+
+ggplot(dat, aes(x = variable, y = percent, fill = variable)) +
+  geom_boxplot(outlier.shape = NA) +
+  geom_jitter(width = 0.1, size = 1.4, alpha = 0.7) +
+  scale_fill_manual(values = cols) +
+  labs(
+    x = "",
+    y = "R. occidentalis (% of reads)"
+  ) +
+  theme_classic(base_size = 14) +
+  theme(legend.position = "none")
+
+
+```
+
+```{r}
+# compliance_cluster_df
+compliance_cluster_df <- compliance_cluster_df %>%
+  rename(Subject.Number = `...1`)
+
+responders_ids <- compliance_cluster_df %>%
+  filter(BRB_response == "Responder") %>%
+  pull(Subject.Number)
+
+# add Subject.Number to BRB species data
+dat2 <- dat %>%
+  left_join(meta %>% select(id, Subject.Number), by = "id")
+
+# keep only responder subjects
+dat_resp <- dat2 %>%
+  filter(Subject.Number %in% responders_ids)
+
+ggplot(dat_resp, aes(x = variable, y = percent, fill = variable)) +
+  geom_boxplot(outlier.shape = NA) +
+  geom_jitter(width = 0.1, size = 1.4, alpha = 0.7) +
+  scale_fill_manual(values = c(
+    rP = "#009E73",
+    tP = "#F0E442",
+    rB = "#56B4E9",
+    tB = "#E69F00"
+  )) +
+  labs(
+    x = "",
+    y = "R. occidentalis (% of reads)"
+  ) +
+  theme_classic(base_size = 14) +
+  theme(legend.position = "none")
+
+
+
+```
