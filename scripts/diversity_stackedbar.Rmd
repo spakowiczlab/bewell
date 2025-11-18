@@ -194,18 +194,18 @@ g1 <- df %>%
         axis.ticks.x = element_blank(),
         axis.text.y = element_blank(),
         panel.grid.major = element_blank(),
-        strip.text.x = element_text(size = 19), 
-        legend.text = element_text(size = 20), 
-        legend.title = element_text(size = 24)) + 
+        strip.text.x = element_text(size = 14), 
+        legend.text = element_text(size = 14), 
+        legend.title = element_text(size = 14)) + 
   facet_row(vars(variable2), scales = "free_x", space = "free", strip.position = "bottom")
 
-ggsave("../figures/fig2B-updated.svg", width = 10, height = 4)
+ggsave("../figures/fig2B-updated.svg", width = 10, height = 3)
 g1
 ```
 
 
 ```{r}
-ggsave(plot = gB, file = "/users/PAS1695/whee57/Github/bewell/figures/BRB_stacked_bar.png", dev = "png", width = 13, height = 13)
-ggsave(plot = gP, file = "/users/PAS1695/whee57/Github/bewell/figures/Placebo_stacked_bar.png", dev = "png", width = 13, height = 13)
-ggsave(plot = g, file = "/users/PAS1695/whee57/Github/bewell/figures/BRB-Placebo_stacked_bar.png", dev = "png", width = 26, height = 13)
+#ggsave(plot = gB, file = "/users/PAS1695/whee57/Github/bewell/figures/BRB_stacked_bar.png", dev = "png", width = 13, height = 13)
+#ggsave(plot = gP, file = "/users/PAS1695/whee57/Github/bewell/figures/Placebo_stacked_bar.png", dev = "png", width = 13, height = 13)
+#ggsave(plot = g, file = "/users/PAS1695/whee57/Github/bewell/figures/BRB-Placebo_stacked_bar.png", dev = "png", width = 26, height = 13)
 ```
