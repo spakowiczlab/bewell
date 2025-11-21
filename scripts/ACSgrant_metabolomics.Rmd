@@ -233,6 +233,8 @@ rb_tb_wide <- rb_tb_data %>%
   select(metabolite, Subject.Number, Timepoint, value) %>%
   pivot_wider(names_from = Timepoint, values_from = value) %>%
   mutate(change = tB - rB)
+write.csv(rb_tb_wide,
+          file = "../data/derived/rb_tb_wide.csv")
 ```
 
 ```{r}
@@ -330,7 +332,6 @@ compliance_cluster_df <- data.frame(
 )
 rownames(compliance_cluster_df) <- compliance_cluster_df$Subject.Number
 compliance_cluster_df <- compliance_cluster_df["compliance_cluster", drop = FALSE]
-library(pheatmap)
 
 pheatmap(
   heat_data_sig,
