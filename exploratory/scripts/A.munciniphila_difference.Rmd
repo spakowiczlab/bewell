@@ -1,0 +1,46 @@
+---
+title: "difference in A. munciniphila"
+author: "Caroline Wheeler"
+date: "11/9/2021"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+
+library(tidyverse)
+library(reshape2)
+
+```
+
+read in data
+```{r}
+taxa <- read.csv("/fs/ess/PAS1695/projects/bewell/data/bewell_taxonomy_relAbun.csv")
+subs <- read.csv("/fs/ess/PAS1695/projects/bewell/data/participants/bewell_subjects.csv")
+```
+
+prep data for akkermansia differences
+```{r}
+akk_taxa <- dplyr::filter(taxa, grepl("muciniphila", Taxonomy))
+
+akk_rB <- dplyr::filter(akk_taxa, variable == "rB")
+akk_tB <- dplyr::filter(akk_taxa, variable == "tB")
+akk_rP <- dplyr::filter(akk_taxa, variable == "rP")
+akk_tP <- dplyr::filter(akk_taxa, variable == "tP")
+  
+akk <- 
+  subs %>%
+  mutate(rB = ifelse(subs$rB %in% akk_rB$id, akk_rB$RelAbun, ifelse(is.na(subs$rB), NA, 0))) %>%
+  mutate(tB = ifelse(subs$tB %in% akk_tB$id, akk_tB$RelAbun, ifelse(is.na(subs$tB), NA, 0))) %>%
+  mutate(rP = ifelse(subs$rP %in% akk_rP$id, akk_rP$RelAbun, ifelse(is.na(subs$rP), NA, 0))) %>%
+  mutate(tP = ifelse(subs$tP %in% akk_tP$id, akk_tP$RelAbun, ifelse(is.na(subs$tP), NA, 0))) %>%
+  select(-placebo, -Subject.Number)
+```
+
+save table
+```{r}
+write.csv(akk,"/fs/ess/PAS1695/projects/bewell/data/bewell_akkermansia.csv", row.names = FALSE)
+```
+
+
+

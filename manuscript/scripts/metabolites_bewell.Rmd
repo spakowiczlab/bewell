@@ -1,0 +1,504 @@
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+
+library(tidyverse)
+library(readxl)
+library(pheatmap)
+library(grid)
+library(svglite)
+library(ggpubr)
+```
+
+read in data
+
+```{r}
+key.long <- readRDS("../../data/derived/clinical_manuscript.rds")$samples_long
+met <- read_excel("../../data/raw/urine-metabolomics/Dan Urine Anthocyanin 11-10-2022.xlsx", sheet = "concentration ng mL") %>%
+  filter(!is.na(`21-V2`))
+```
+
+```{r}
+met <- met %>%
+  mutate_at(vars(-...1), ~as.numeric(.)) %>%
+  mutate_at(vars(-...1), ~replace(., is.na(.), 0)) %>%
+  pivot_longer(
+    cols = 2:81, 
+    names_to = "Sample",
+    values_to = "value",
+    values_transform = ~ as.numeric(gsub(",", "", .x))
+  ) %>%
+  rename("metabolite" = `...1`) %>%
+  separate(Sample, c("Subject.Number", "v")) %>%
+  mutate(v = toupper(v))
+```
+
+prep key
+
+```{r}
+key.long <- key.long %>%
+  mutate(v =  toupper(substr(timepoints, 11, 12)),
+         v = ifelse(v == "-V", toupper(substr(timepoints, 12, 13)), v),
+         Subject.Number = as.character(Subject.Number)) %>%
+  select(Subject.Number, v, Timepoint) 
+
+# join to met 
+met <- met %>%
+  mutate(Subject.Number = as.character(Subject.Number)) %>%
+  left_join(key.long, by = c("Subject.Number", "v"))
+```
+
+Note: key.long doesn't include participants 84, 101, 102 that are present in metabolomics data Would like to check that the timepoint key includes all participants as it was developed early on...
+
+plot metabolites
+
+```{r}
+met$Timepoint <- factor(met$Timepoint, levels=c("rP", "tP", "rB", "tB"))
+
+met %>%
+  filter(!is.na(Timepoint)) %>%
+  ggplot(aes(x = Timepoint, y = value)) +
+  geom_boxplot() +
+  facet_wrap(metabolite ~ ., scales = "free_y") +
+  xlab("") +
+  ylab("ng/mL") + 
+  theme(base.size = 10) +
+  theme_bw()
+
+ggsave("../../exploratory/figures/metabolomics_boxplot.png", dev="png", height = 6, width = 5, dpi = 400)
+```
+
+# SJ
+
+```{r}
+# Rename levels for legend clarity
+met_brb <- met %>%
+  filter(Timepoint %in% c("rB", "tB")) %>%
+  mutate(
+    Timepoint = factor(Timepoint, levels = c("rB", "tB")),
+    Timepoint = recode(Timepoint, "rB" = "Pre-BRB", "tB" = "Post-BRB")
+  )
+
+# Plot
+ggplot(met_brb, aes(x = Timepoint, y = value, group = Subject.Number)) +
+  geom_line(color = "gray40", alpha = 0.5) +
+  geom_point(aes(color = Timepoint), size = 2) +
+  facet_wrap(~ metabolite, scales = "free_y") +
+  scale_color_manual(values = c("Pre-BRB" = "gold", "Post-BRB" = "purple4")) +
+  labs(
+    y = "ng/mL",
+    x = "Timepoint"
+  ) +
+  theme_bw(base_size = 10) +
+  theme(
+    strip.text = element_text(face = "bold"),
+    legend.position = "right"
+  )
+
+```
+```{r}
+rb_tb_wide_all <- met %>%
+  filter(Timepoint %in% c("rB", "tB")) %>%
+  select(metabolite, Subject.Number, Timepoint, value) %>%
+  pivot_wider(names_from = Timepoint, values_from = value) %>%
+  mutate(change = tB - rB)
+
+write.csv(
+  rb_tb_wide_all,
+  file = "../../data/derived/rb_tb_wide_all.csv",
+  row.names = FALSE
+)
+
+heat_data_all <- rb_tb_wide_all %>%
+  select(Subject.Number, metabolite, change) %>%
+  pivot_wider(names_from = metabolite, values_from = change) %>%
+  column_to_rownames("Subject.Number") %>%
+  as.matrix()
+
+heat_data_z <- scale(heat_data_all)
+
+Heat<-
+  pheatmap(
+  heat_data_z,
+  cluster_rows = TRUE,
+  cluster_cols = TRUE,
+  color = colorRampPalette(c("purple4", "white", "red3"))(100),
+  fontsize_row = 8
+)
+ggsave("../../exploratory/figures/metabolomics_heatmap1.svg", Heat, width = 6, height = 4)
+
+```
+```{r}
+rb_tb_wide_all <- met %>%
+  filter(Timepoint %in% c("rB", "tB")) %>%
+  select(metabolite, Subject.Number, Timepoint, value) %>%
+  pivot_wider(names_from = Timepoint, values_from = value) %>%
+  mutate(change = tB - rB)
+
+write.csv(
+  rb_tb_wide_all,
+  file = "../../data/derived/rb_tb_wide_all.csv",
+  row.names = FALSE
+)
+
+heat_data_all <- rb_tb_wide_all %>%
+  select(Subject.Number, metabolite, change) %>%
+  pivot_wider(names_from = metabolite, values_from = change) %>%
+  column_to_rownames("Subject.Number") %>%
+  as.matrix()
+
+met_order <- c(
+  "cy sam",
+  "peon sam",
+  "cy rut",
+  "peon rut",
+  "cy hex",
+  "peon hex",
+  "cy xyrut",
+  "peon xyrut",
+
+  "cy sulf",
+  "peon gluA",
+  "cy glc sulf",
+  "cy gluA",
+
+  "pga",
+  "pca",
+  "ferulic acid",
+  "vanillic acid"
+)
+
+heat_data_z <- heat_data_z[, met_order]
+
+
+Heat <- pheatmap(
+  heat_data_z,
+  cluster_rows = TRUE,
+  cluster_cols = FALSE,
+  color = colorRampPalette(c("purple4", "white", "red3"))(100),
+  fontsize_row = 8
+)
+
+ggsave("../figures/fig2F.svg", Heat, width = 7, height = 4)
+
+```
+
+
+```{r}
+# Ensure correct timepoint order
+met$Timepoint <- factor(met$Timepoint, levels = c("rP", "tP", "rB", "tB"))
+
+# Paired Wilcoxon test (correct way)
+wilcox_rb_tb <- met %>%
+  filter(Timepoint %in% c("rB", "tB")) %>%
+  select(Subject.Number, metabolite, Timepoint, value) %>%
+  pivot_wider(names_from = Timepoint, values_from = value) %>%
+  filter(!is.na(rB), !is.na(tB)) %>%
+  group_by(metabolite) %>%
+  summarise(
+    p.value = wilcox.test(rB, tB, paired = TRUE)$p.value,
+    .groups = "drop"
+  ) %>%
+  mutate(p.adj = p.adjust(p.value, method = "BH"))
+
+# Select significant metabolites (use raw p for plotting)
+sig_mets <- wilcox_rb_tb %>%
+  filter(p.value < 0.05) %>%
+  pull(metabolite)
+
+# Subset for plotting
+met_comp <- met %>%
+  filter(Timepoint %in% c("rB", "tB"),
+         metabolite %in% sig_mets)
+
+# Plot
+ggplot(met_comp, aes(x = Timepoint, y = value, group = Subject.Number)) +
+  geom_line(alpha = 0.4) +
+  geom_point(aes(color = Timepoint), size = 2) +
+  facet_wrap(~ metabolite, scales = "free_y") +
+  scale_color_manual(values = c("rB" = "gold", "tB" = "purple")) +
+  labs(
+    title = "Compliance Check: Metabolite Increase Post BRB",
+    y = "ng/mL"
+  ) +
+  theme_bw(base_size = 11)
+
+# Check results
+wilcox_rb_tb %>% arrange(p.adj)
+length(sig_mets)
+```
+
+```{r}
+# Get significant metabolite names
+sig_metabs <- sig_mets
+
+# Subset original data
+rb_tb_data <- met %>%
+  filter(Timepoint %in% c("rB", "tB"),
+         metabolite %in% sig_metabs)
+
+rb_tb_wide <- rb_tb_data %>%
+  select(metabolite, Subject.Number, Timepoint, value) %>%
+  pivot_wider(names_from = Timepoint, values_from = value) %>%
+  mutate(change = tB - rB)
+write.csv(
+  rb_tb_wide,
+  file = "../../data/derived/rb_tb_wide.csv",
+  row.names = FALSE
+)
+```
+
+```{r}
+# Loop through each metabolite and plot the changes
+for (metab in unique(rb_tb_wide$metabolite)) {
+  p <- rb_tb_wide %>%
+    filter(metabolite == metab) %>%
+    ggplot(aes(x = factor(Subject.Number), y = change)) +
+    geom_col(fill = "steelblue") +
+    labs(title = paste("Change in", metab, "per participant"),
+         x = "Subject", y = "Change (tB - rB)") +
+    theme_minimal()
+
+  print(p)  # shows the plot if interactive
+  ggsave(paste0("../../exploratory/figures/", gsub(" ", "_", metab), "_barplot.png"), plot = p, width = 6, height = 4)
+}
+
+```
+
+```{r}
+my_colors <- c("#4E79A7", "#F28E2B", "#E15759", "#76B7B2", "#59A14F",
+               "#EDC948", "#B07AA1", "#FF9DA7", "#9C755F", "#BAB0AC")
+
+rb_tb_wide %>%
+  ggplot(aes(x = factor(Subject.Number), y = change, fill = factor(Subject.Number))) +
+  geom_col() +
+  facet_wrap(~ metabolite, scales = "free_y") +
+  scale_fill_manual(values = rep(my_colors, length.out = length(unique(rb_tb_wide$Subject.Number)))) +
+  labs(x = "Participant ID", y = "Change in Metabolite Concentration (ng/mL)") +
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle = 90, hjust = 1),
+        legend.position = "none")
+
+
+```
+
+```{r}
+# Use same significance definition as above (sig_mets)
+met_rb_tb <- met %>%
+  filter(Timepoint %in% c("rB", "tB"),
+         metabolite %in% sig_mets)
+
+# Create wide format and compute change
+met_diff <- met_rb_tb %>%
+  select(Subject.Number, metabolite, Timepoint, value) %>%
+  pivot_wider(names_from = Timepoint, values_from = value) %>%
+  filter(!is.na(rB), !is.na(tB)) %>%
+  mutate(change = tB - rB)
+
+# Safe plotting
+if (nrow(met_diff) == 0) {
+  message("No complete rB–tB pairs available for density plot")
+} else {
+  ggplot(met_diff, aes(x = change)) +
+    geom_density(fill = "lightblue", alpha = 0.6) +
+    facet_wrap(~ metabolite, scales = "free") +
+    labs(x = "(ng/mL)") +
+    theme_bw(base_size = 11)
+}
+
+```
+
+```{r}
+heat_data_sig <- rb_tb_wide %>%
+  filter(metabolite %in% sig_mets) %>%
+  select(Subject.Number, metabolite, change) %>%
+  pivot_wider(names_from = metabolite, values_from = change) %>%
+  column_to_rownames("Subject.Number") %>%
+  as.matrix()
+
+# Scale each metabolite across participants
+heat_data_sig_z <- scale(heat_data_sig)
+
+# Hierarchical clustering on scaled data
+row_dist <- dist(heat_data_sig_z)
+row_clust <- hclust(row_dist)
+
+# Cut dendrogram into 2 clusters
+cluster_assignments <- cutree(row_clust, k = 2)
+
+# Check which cluster has higher polyphenol change
+cluster_means <- tapply(
+  rowMeans(heat_data_sig, na.rm = TRUE),
+  cluster_assignments,
+  mean,
+  na.rm = TRUE
+)
+
+cluster_means
+
+```
+
+```{r}
+# Automatically define responder as the cluster with higher mean change
+responder_cluster <- as.numeric(names(which.max(cluster_means)))
+
+merged_clusters <- ifelse(
+  cluster_assignments == responder_cluster,
+  "Responder",
+  "Non-responder"
+)
+
+# Build responder annotation dataframe
+compliance_cluster_df <- data.frame(
+  BRB_response = merged_clusters
+)
+
+rownames(compliance_cluster_df) <- rownames(heat_data_sig_z)
+
+
+pheatmap(
+  heat_data_sig_z,
+  annotation_row = compliance_cluster_df,
+  cluster_rows = TRUE,
+  cluster_cols = TRUE,
+  color = colorRampPalette(c("purple4", "white", "red2"))(100)
+)
+```
+```{r}
+heat_data_sig <- rb_tb_wide %>%
+  filter(metabolite %in% sig_mets) %>%
+  select(Subject.Number, metabolite, change) %>%
+  pivot_wider(names_from = metabolite, values_from = change) %>%
+  column_to_rownames("Subject.Number") %>%
+  as.matrix()
+
+# Scale each metabolite across participants
+heat_data_sig_z <- scale(heat_data_sig)
+
+# Create polyphenol response score per participant
+score_df <- data.frame(
+  pt = rownames(heat_data_sig_z),
+  poly_score = rowMeans(heat_data_sig_z, na.rm = TRUE)
+)
+
+# Define responders using median split
+score_df <- score_df %>%
+  mutate(
+    BRB_response = ifelse(
+      poly_score >= median(poly_score, na.rm = TRUE),
+      "Responder",
+      "Non-responder"
+    )
+  )
+
+# Build annotation dataframe
+compliance_cluster_df <- score_df %>%
+  select(pt, BRB_response)
+
+rownames(compliance_cluster_df) <- compliance_cluster_df$pt
+compliance_cluster_df <- compliance_cluster_df[, "BRB_response", drop = FALSE]
+
+pheatmap(
+  heat_data_sig_z,
+  annotation_row = compliance_cluster_df,
+  cluster_rows = TRUE,
+  cluster_cols = TRUE,
+  color = colorRampPalette(c("purple4", "white", "red2"))(100)
+)
+
+write.csv(
+  compliance_cluster_df,
+  file = "../../data/derived/compliance_cluster_df.csv"
+)
+```
+
+```{r}
+# Pick one non-significant metabolite
+no_change_met <- wilcox_rb_tb %>%
+  filter(p.adj > 0.5) %>%
+  filter(metabolite %in% unique(met$metabolite)) %>%
+  filter(!metabolite %in% c("cy rut", "cy xyrut")) %>%
+  slice(1) %>%
+  pull(metabolite)
+
+# Set desired facet order
+met_order <- c("cy rut", "cy xyrut", no_change_met)
+
+# Plot
+met %>%
+  filter(Timepoint %in% c("rB", "tB"),
+         metabolite %in% met_order) %>%
+  mutate(
+    Timepoint = recode(Timepoint, "rB" = "Pre-BRB", "tB" = "Post-BRB"),
+    metabolite = factor(metabolite, levels = met_order)  # enforce facet order
+  ) %>%
+  ggplot(aes(x = Timepoint, y = value)) +
+  geom_boxplot(fill = "lightblue", outlier.shape = NA) +
+  geom_jitter(width = 0.2, size = 1.5, alpha = 0.6) +  # show individual points
+  facet_wrap(~ metabolite, scales = "free_y") +
+  labs(x = "", y = "ng/mL") +
+  theme_bw(base_size = 9)
+
+ggsave("../../exploratory/figures/metabolomics_3boxplot.svg", height = 4, width = 6)
+
+```
+
+```{r}
+# Define comparisons (Pre-BRB vs Post-BRB for each metabolite)
+comparisons <- list(c("Pre-BRB", "Post-BRB"))
+
+met %>%
+  filter(Timepoint %in% c("rB", "tB"),
+         metabolite %in% met_order) %>%
+  mutate(
+    Timepoint = recode(Timepoint, "rB" = "Pre-BRB", "tB" = "Post-BRB"),
+    metabolite = factor(metabolite, levels = met_order)
+  ) %>%
+  ggplot(aes(x = Timepoint, y = value)) +
+  geom_boxplot(fill = "lightblue", outlier.shape = NA) +
+  geom_jitter(width = 0.2, size = 1.5, alpha = 0.6) +
+  facet_wrap(~ metabolite, scales = "free_y") +
+  labs(x = "", y = "(ng/mL)") +
+  theme_bw(base_size = 15) +
+  theme(axis.text.x = element_text(angle = 20, hjust = 1)) +
+  stat_compare_means(
+    comparisons = comparisons, 
+    method = "wilcox.test", 
+    label = "p.signif"     # <-- asterisks instead of raw p-values
+  )
+
+ggsave("../../exploratory/figures/metabolomics_3boxplot1.svg", height = 4, width = 6)
+
+```
+
+```{r}
+comparisons <- list(c("Pre-BRB", "Post-BRB"),c("Pre-Placebo", "Post-Placebo"))
+
+met %>%
+  filter(Timepoint %in% c("rB", "tB", "rP", "tP"),
+         metabolite %in% met_order) %>%
+  mutate(
+    Timepoint = recode(Timepoint,
+                       "rB" = "Pre-BRB",  "tB" = "Post-BRB",
+                       "rP" = "Pre-Placebo", "tP" = "Post-Placebo"),
+    Timepoint = factor(Timepoint,
+                       levels = c("Pre-Placebo","Post-Placebo","Pre-BRB","Post-BRB")),
+    metabolite = factor(metabolite, levels = met_order)
+  ) %>%
+  ggplot(aes(x = Timepoint, y = value)) +
+  geom_boxplot(fill = "lightblue", outlier.shape = NA) +
+  geom_jitter(width = 0.2, size = 1.5, alpha = 0.6) +
+  facet_wrap(~ metabolite, scales = "free_y") +
+  labs(x = "", y = "(ng/mL)") +
+  theme_bw(base_size = 15) +
+  theme(axis.text.x = element_text(angle = 20, hjust = 1))+
+  stat_compare_means(
+  comparisons = comparisons,
+  method = "wilcox.test",
+  method.args = list(paired = TRUE),
+  label = "p.signif"
+)
+ggsave("../figures/fig2E.svg", height = 4, width = 6)
+```
+
+

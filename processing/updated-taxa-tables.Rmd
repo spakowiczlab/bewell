@@ -1,0 +1,103 @@
+---
+title: "updated taxa tables"
+author: "Caroline Wheeler"
+date: "7/22/2024"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+
+library(tidyverse)
+```
+
+```{r}
+barcodes <- read.csv("/fs/ess/PAS1695/projects/bewell/data/participants/bewell_barcodes.csv")
+metab <- read.csv("/fs/ess/PAS1695/projects/bewell/data/2024-02-01_mpa-aggregate.csv")
+```
+
+```{r}
+df <- merge(barcodes, metab)
+df$id <- as.character(df$id)
+```
+
+add timepoint value
+```{r}
+subs <- read_csv("/fs/ess/PAS1695/projects/bewell/data/participants/bewell_subjects.csv")
+
+keep <- subs %>%
+  pivot_longer(!c("Subject ID", "Subject.Number", "placebo"), names_to = "variable", values_to = "id")
+
+df <- merge(keep, df)
+```
+
+## Create long form tables for each taxonomic level
+
+Seperate taxonomic levels
+```{r}
+df.tax <- df %>%
+  mutate(sampleID = paste0(Subject.Number, "-", variable)) %>%
+  select(sampleID, Taxonomy, RelAbun)
+
+taxa <- df.tax %>% 
+  separate(Taxonomy, c("Kingdom", "Phylum", "Class", "Order", "Family", "Genus", "Species", "t"), "\\|")
+
+get_level <- function(lev, next_lev){
+  temp <- taxa %>%
+    filter(is.na(taxa[,next_lev])) %>%
+    select(sampleID, lev, RelAbun)
+
+  return(temp)
+}
+
+taxa_king <- get_level("Kingdom", "Phylum")
+taxa_phyl <- get_level("Phylum", "Class") %>% filter(!(is.na(Phylum)))
+taxa_class <- get_level("Class", "Order") %>% filter(!(is.na(Class)))
+taxa_ord <- get_level("Order", "Family") %>% filter(!(is.na(Order)))
+taxa_fam <- get_level("Family", "Genus") %>% filter(!(is.na(Family)))
+taxa_gen <- get_level("Genus", "Species") %>% filter(!(is.na(Genus)))
+taxa_spec <- get_level("Species", "t") %>% filter(!(is.na(Species)))
+```
+
+change to wide form
+```{r}
+go_wide <- function(df, level){
+  d <- df %>%
+    pivot_wider(names_from = level, values_from = `RelAbun`)
+  d <- spread(df, key = level, value = RelAbun) 
+  d[is.na(d)] <- 0
+  d <- d %>%
+    column_to_rownames("sampleID")
+  
+  return(d)
+}
+
+df_king <- go_wide(taxa_king, "Kingdom")
+df_phyl <- go_wide(taxa_phyl, "Phylum")
+df_class <- go_wide(taxa_class, "Class")
+df_ord <- go_wide(taxa_ord, "Order")
+df_fam <- go_wide(taxa_fam, "Family")
+df_gen <- go_wide(taxa_gen, "Genus")
+df_spec <- go_wide(taxa_spec, "Species")
+```
+
+Save data tables
+```{r}
+write.csv(df_king,"/fs/ess/PAS1695/projects/bewell/data/RelAbun/2024-02-01_RelAbun_king.csv")
+write.csv(df_phyl,"/fs/ess/PAS1695/projects/bewell/data/RelAbun/2024-02-01_RelAbun_phyl.csv")
+write.csv(df_class,"/fs/ess/PAS1695/projects/bewell/data/RelAbun/2024-02-01_RelAbun_class.csv")
+write.csv(df_ord,"/fs/ess/PAS1695/projects/bewell/data/RelAbun/2024-02-01_RelAbun_ord.csv")
+write.csv(df_fam,"/fs/ess/PAS1695/projects/bewell/data/RelAbun/2024-02-01_RelAbun_fam.csv")
+write.csv(df_gen,"/fs/ess/PAS1695/projects/bewell/data/RelAbun/2024-02-01_RelAbun_gen.csv")
+write.csv(df_spec,"/fs/ess/PAS1695/projects/bewell/data/RelAbun/2024-02-01_RelAbun_spec.csv")
+```
+remove rows with t_SGB to avoid duplicates 
+```{r}
+df <- df %>%
+  filter(!grepl("t__SGB", Taxonomy))
+```
+
+save table
+```{r}
+write.csv(df,"/fs/ess/PAS1695/projects/bewell/data/2024-02-01_bewell_taxonomy_relAbun.csv", row.names = FALSE)
+```

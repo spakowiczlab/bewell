@@ -1,0 +1,137 @@
+---
+title: "metabolomics_heatmap-and-model"
+output: html_document
+date: "2023-09-13"
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+
+library(tidyverse)
+library(readxl)
+library(rlist)
+library(glmm)
+library(broom)
+```
+
+# Load data
+
+```{r}
+metfiles <- list.files("../data/raw/urine-metabolomics/")
+
+# met <- readxl::read_xlsx("../data/raw/urine-metabolomics/Dan Urine Anthocyanin 11-10-2022.xlsx")
+
+metabs <- read_excel("../data/raw/urine-metabolomics/Dan Urine Anthocyanin 11-10-2022.xlsx", sheet = "concentration ng mL", n_max = 16)
+colnames(metabs)[1] <- "metab.id"
+
+timepoint.key <- readRDS("../../data/derived/clinical_manuscript.rds")$samples_long
+
+metnames <- read_excel("../data/raw/urine-metabolomics/Dan Urine Anthocyanin 11-10-2022.xlsx", sheet = "concentration ng mL", skip = 18, col_names = F)
+```
+
+# Format
+
+```{r proper metab names}
+colnames(metnames) <- c("abbrieve", "formal")
+
+metnames.form <- metnames %>%
+  mutate(abbrieve = make.names(abbrieve))
+```
+
+```{r general long form}
+tpoint.join <- timepoint.key %>%
+  mutate(sample = toupper(gsub("HONC60-", "", timepoints))) %>%
+  select(sample, Subject.ID, Timepoint) %>%
+  mutate(sample = str_remove(sample, "\\.1$"))
+
+metabs.l <- metabs %>%
+  mutate(across(.cols = -metab.id, ~ as.numeric(.x)),
+         metab.id = make.names(metab.id)) %>%
+  pivot_longer(-metab.id, names_to = "sample", values_to = "ng.ml") %>%
+  mutate(sample = toupper(sample)) %>%
+  left_join(tpoint.join) %>%
+  mutate(ng.ml = replace_na(ng.ml, 0))
+
+tB.points <- metabs.l %>%
+  filter(Timepoint == "tB") %>%
+  select(metab.id, Subject.ID, ng.ml) %>%
+  rename("tB.ng.ml" = "ng.ml")
+```
+
+```{r heatmap calculations and clustering}
+metabs.heatin <- metabs.l %>%
+  filter(!Timepoint == "tB") %>%
+  select(Subject.ID, Timepoint, metab.id, ng.ml) %>%
+  left_join(tB.points) %>%
+  mutate(visit.diff = tB.ng.ml - ng.ml) %>%
+  group_by(Subject.ID, metab.id) %>%
+  summarise(tot.dif = sum(visit.diff)) %>%
+  ungroup() %>%
+  mutate(avg.diff = tot.dif/3)
+
+hmap.roword <- metabs.heatin %>%
+  select(-tot.dif) %>%
+  pivot_wider(names_from = metab.id, values_from = avg.diff) %>%
+  column_to_rownames(var = "Subject.ID") %>%
+  dist() %>%
+  hclust()
+hmap.roword.ext <- hmap.roword$labels[hmap.roword$order]
+
+hmap.colord <- metabs.heatin %>%
+  select(-tot.dif) %>%
+  pivot_wider(names_from = Subject.ID, values_from = avg.diff) %>%
+  column_to_rownames(var = "metab.id") %>%
+  dist() %>%
+  hclust()
+hmap.colord.ext <- hmap.colord$labels[hmap.colord$order]
+```
+
+```{r modelling input}
+# earlysamps <- timepoint.key %>%
+#   filter(placebo == "Week 6")
+moddat <- metabs.l %>%
+  # filter(
+  #   Subject.ID %in% earlysamps$Subject.ID &
+  #          Timepoint %in% c("rB", "tB")) %>%
+  pivot_wider(names_from = metab.id, values_from = ng.ml) %>%
+  mutate(berry.group = ifelse(Timepoint == "tB", 1, 0))
+```
+
+# Heatmap
+
+```{r}
+
+ggplot(metabs.heatin, aes(x = fct_relevel(metab.id, hmap.colord.ext),
+                          y = fct_relevel(Subject.ID, hmap.roword.ext),
+                          fill = avg.diff)) +
+  geom_tile() +
+  scale_fill_distiller(palette = "RdYlBu", name = "Post-BRB difference to\nother visits") +
+  scale_x_discrete(breaks= metnames.form$abbrieve, labels = metnames.form$formal) +
+  labs(x = "Metabolite", y = "Patient") +
+  theme_bw() +
+  theme(axis.text.x = element_text(angle = 90, hjust = 1))
+ggsave("../figures/heatmap_metabolites_BRB-v-other.png")
+```
+
+# Modelling
+
+```{r}
+capture.models.univ.former <- function(outcome, lfun, mics, modin){
+  mods.list <- lapply(mics, function(x)  try({glm(as.formula(paste0(outcome, " ~ ", x)), family = lfun, data = modin) %>% tidy()}))
+  mods.list.clean <- list.clean(mods.list, function(x) is.null(x))
+  mods.df <- bind_rows(mods.list.clean)
+  return(mods.df)
+}
+```
+
+```{r}
+modres <-capture.models.univ.former("berry.group", "binomial",
+                                    metnames.form$abbrieve, moddat) %>%
+  filter(term != "(Intercept)") %>%
+  rename("abbrieve" = "term") %>%
+  left_join(metnames.form, .) %>%
+  arrange(p.value) %>%
+  mutate(padj = p.adjust(p.value, method = "fdr"))
+
+write.csv(modres, "../data/modelling_metabolomics-berrygroup.csv", row.names = F)
+```

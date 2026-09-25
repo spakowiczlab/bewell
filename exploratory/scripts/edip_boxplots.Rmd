@@ -1,0 +1,87 @@
+---
+title: "edip_boxplots"
+author: "Bailey Conrad"
+date: "`r Sys.Date()`"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+
+library(tidyverse)
+library(glmm)
+library(broom)
+library(rlist)
+library(ggplot2)
+library(ggtext)
+library(dplyr)
+```
+
+```{r}
+samplabs <- readRDS("../../data/derived/clinical_manuscript.rds")$samples
+FFQ <- readRDS("../../data/derived/clinical_manuscript.rds")$diet
+```
+
+#Roseburia-19, 68, 96
+
+#Not adjusted for calories
+```{r}
+edip_roseburia <- FFQ %>%
+  select(Username, resinversedip) %>%
+  mutate(yes = case_when(Username == "HONC60-19" | Username == "HONC60-68" | Username == "HONC60-96" ~ '1')) %>%
+  mutate(no = case_when(Username == "HONC60-01" | Username == "HONC60-101" | Username == "HONC60-102" | Username == "HONC60-17"| Username == "HONC60-21"| Username == "HONC60-24"| Username == "HONC60-03"| Username == "HONC60-52"| Username == "HONC60-54"| Username == "HONC60-55"| Username == "HONC60-57"| Username == "HONC60-58"| Username == "HONC60-60"| Username == "HONC60-61"| Username == "HONC60-62"| Username == "HONC60-64"| Username == "HONC60-07"| Username == "HONC60-70"| Username == "HONC60-71"| Username == "HONC60-76"| Username == "HONC60-77"| Username == "HONC60-79"| Username == "HONC60-81"| Username == "HONC60-84"| Username == "HONC60-85"| Username == "HONC60-95"| Username == "HONC60-97"| Username == "HONC60-99" | Username == "HONC60-05" ~ '2')) %>%
+pivot_longer(names_to = "groups.label", values_to = "groups", cols = c("yes", "no")) %>%
+na.omit() 
+```
+
+```{r}
+edip_rose <- ggplot(edip_roseburia, aes(x = groups.label, y = resinversedip)) +
+  geom_boxplot() +
+  theme_bw() +
+  labs(x = "Roseburia increase", y = "EDIP") 
+
+edip_rose
+```
+
+#Blautia-17, 52, 85
+
+#Not adjusted for calories
+```{r}
+edip_blautia <- FFQ %>%
+  select(Username, resinversedip) %>%
+  mutate(yes = case_when(Username == "HONC60-17" | Username == "HONC60-52" | Username == "HONC60-85" ~ '1')) %>%
+  mutate(no = case_when(Username == "HONC60-01" | Username == "HONC60-101" | Username == "HONC60-102" | Username == "HONC60-19"| Username == "HONC60-21"| Username == "HONC60-24"| Username == "HONC60-03"| Username == "HONC60-68"| Username == "HONC60-54"| Username == "HONC60-55"| Username == "HONC60-57"| Username == "HONC60-58"| Username == "HONC60-60"| Username == "HONC60-61"| Username == "HONC60-62"| Username == "HONC60-64"| Username == "HONC60-07"| Username == "HONC60-70"| Username == "HONC60-71"| Username == "HONC60-76"| Username == "HONC60-77"| Username == "HONC60-79"| Username == "HONC60-81"| Username == "HONC60-84"| Username == "HONC60-96"| Username == "HONC60-95"| Username == "HONC60-97"| Username == "HONC60-99" | Username == "HONC60-05" ~ '2')) %>%
+pivot_longer(names_to = "groups.label", values_to = "groups", cols = c("yes", "no")) %>%
+na.omit() 
+```
+
+```{r}
+edip_blaut <- ggplot(edip_blautia, aes(x = groups.label, y = resinversedip)) +
+  geom_boxplot() +
+  theme_bw() +
+  labs(x = "Blautia increase", y = "EDIP") 
+
+edip_blaut
+```
+
+#Lachno-24, 05, 79
+
+#Not adjusted for calories
+```{r}
+edip_lachno <- FFQ %>%
+  select(Username, edip, resinversedip) %>%
+  mutate(yes = case_when(Username == "HONC60-24" | Username == "HONC60-05" | Username == "HONC60-79" ~ '1')) %>%
+  mutate(no = case_when(Username == "HONC60-01" | Username == "HONC60-101" | Username == "HONC60-102" | Username == "HONC60-19"| Username == "HONC60-21"| Username == "HONC60-27"| Username == "HONC60-03"| Username == "HONC60-68"| Username == "HONC60-54"| Username == "HONC60-55"| Username == "HONC60-57"| Username == "HONC60-58"| Username == "HONC60-60"| Username == "HONC60-61"| Username == "HONC60-62"| Username == "HONC60-64"| Username == "HONC60-07"| Username == "HONC60-70"| Username == "HONC60-71"| Username == "HONC60-76"| Username == "HONC60-77"| Username == "HONC60-85"| Username == "HONC60-81"| Username == "HONC60-84"| Username == "HONC60-96"| Username == "HONC60-95"| Username == "HONC60-97"| Username == "HONC60-99" | Username == "HONC60-05" ~ '2')) %>%
+pivot_longer(names_to = "groups.label", values_to = "groups", cols = c("yes", "no")) %>%
+na.omit() 
+```
+
+```{r}
+edip_lach <- ggplot(edip_lachno, aes(x = groups.label, y = resinversedip)) +
+  geom_boxplot() +
+  theme_bw() +
+  labs(x = "Lachnospira pectinoschiza increase", y = "EDIP") 
+
+edip_lach
+```
+

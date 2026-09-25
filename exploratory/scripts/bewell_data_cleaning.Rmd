@@ -1,0 +1,147 @@
+---
+title: "bewell data cleaning"
+author: "Caroline Wheeler"
+date: "8/18/2021"0
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+
+library(REDCapR)
+library(tidyverse)
+library(eeptools)
+
+source("00-paths.R")
+```
+
+<!-- using API token to get data from redcap -->
+<!-- ```{r} -->
+<!-- df <- redcap_read_oneshot(redcap_uri = "https://redcap.osumc.edu/redcap/api/", -->
+<!--                                 token = "[insert token here]")$data -->
+<!-- ``` -->
+
+load data from T-drive
+```{r}
+df <- read.csv(file.path(paths$data, "P426HONC60BeWell_DATA_2021-08-18_0957.csv")) %>%
+  na_if("")
+```
+
+cleaning
+```{r}
+demogs <- df %>%
+  drop_na(subject_fname) %>%
+  select(subject_number, subject_dob, sex, current_smoke_elig, exc_smoker)
+
+demogs2 <- df %>%
+  drop_na(medical_history_questionnaire_complete) %>%
+  select(subject_number, race, ethnicity, antibiotics, current_smoke, past_smoker)
+
+demogs <- full_join(demogs, demogs2, by="subject_number")
+rm(demogs2)
+```
+
+convert DOB to age in years
+```{r}
+demogs$subject_dob <- as.Date(demogs$subject_dob)
+ages <- floor(age_calc(na.omit(demogs$subject_dob), units = "years"))
+demogs$age[!is.na(demogs$subject_dob)] <- ages
+
+demogs <- demogs %>% select(-subject_dob)
+```
+
+create smoking status variable
+```{r}
+# 0 = never smoked, 1 = past smoker, 2 = current smoker 
+demogs <- demogs %>%
+  mutate(
+    smoking_status_ES = ifelse(demogs$exc_smoker == 0, 0, ifelse(demogs$current_smoke_elig == 1, 2, 1)),
+    smoking_status_MHQ = ifelse(demogs$current_smoke == 1, 2, ifelse(demogs$past_smoker == 1, 1, 0))
+  ) %>%
+  select(-exc_smoker, -past_smoker, -current_smoke, -current_smoke_elig)
+```
+
+
+prepare IPAQ variables
+```{r}
+ipaq <- df %>%
+  drop_na(ipaq_ss_vday) %>%
+  select(subject_number, ipaq_ss_vday, ipaq_ss_vdhrs, ipaq_ss_vdmin, ipaq_ss_mday, ipaq_ss_mdhrs, ipaq_ss_mdmin, ipaq_ss_wday, ipaq_ss_wdhrs, ipaq_ss_wdmin)
+
+ipaq$vday <- ipaq$ipaq_ss_vday
+ipaq$mday <- ipaq$ipaq_ss_mday
+ipaq$wday <- ipaq$ipaq_ss_wday
+
+ipaq$mday[is.na(ipaq$mday)] <- 0
+ipaq$wday[is.na(ipaq$wday)] <- 0
+ipaq$mdaywday <- ipaq$mday + ipaq$wday
+ipaq$vdaymdaywday <- ipaq$vday + ipaq$mday + ipaq$wday
+
+ipaq$ipaq_ss_vdhrs[is.na(ipaq$ipaq_ss_vdhrs)] <- 0
+ipaq$ipaq_ss_vdmin[is.na(ipaq$ipaq_ss_vdmin)] <- 0
+ipaq$ipaq_ss_mdhrs[is.na(ipaq$ipaq_ss_mdhrs)] <- 0
+ipaq$ipaq_ss_mdmin[is.na(ipaq$ipaq_ss_mdmin)] <- 0
+ipaq$ipaq_ss_wdhrs[is.na(ipaq$ipaq_ss_wdhrs)] <- 0
+ipaq$ipaq_ss_wdmin[is.na(ipaq$ipaq_ss_wdmin)] <- 0
+
+ipaq$vtime <- 60*(ipaq$ipaq_ss_vdhrs) + ipaq$ipaq_ss_vdmin
+ipaq$mtime <- 60*(ipaq$ipaq_ss_mdhrs) + ipaq$ipaq_ss_mdmin
+ipaq$wtime <- 60*(ipaq$ipaq_ss_wdhrs) + ipaq$ipaq_ss_wdmin
+
+ipaq$METwalking <- (3.3*ipaq$wtime*ipaq$wday)
+ipaq$METmoderate <- (4*ipaq$mday*ipaq$mtime)
+ipaq$METvig <- (8*ipaq$vday*ipaq$vtime)
+ipaq$METmins <- ipaq$METwalking + ipaq$METmoderate + ipaq$METvig
+ipaq$mtimewtime <- ipaq$mtime + ipaq$wtime
+  
+ipaq <- ipaq %>%
+  select(-ipaq_ss_vday, -ipaq_ss_mday, -ipaq_ss_wday, -ipaq_ss_vdhrs, -ipaq_ss_vdmin, -ipaq_ss_mdhrs, -ipaq_ss_mdmin, -ipaq_ss_wdhrs, -ipaq_ss_wdmin)
+```
+
+get IPAQ score
+```{r}
+ipaq <- ipaq %>%
+  mutate(
+    IPAQscore = ifelse(vday > 2,
+                       ifelse(vtime > 19, 
+                              ifelse(METvig > 1499, 3, 
+                                     ifelse(vdaymdaywday > 6 && METmins > 2999, 3, 2)), 
+                              ifelse(mdaywday > 4,
+                                     ifelse(mtimewtime > 29, 2,
+                                            ifelse(vdaymdaywday > 4 && METmins > 599, 2, 1)), 1)),
+                       ifelse(mdaywday > 4, 
+                              ifelse(mtimewtime > 29, 2, 
+                                     ifelse(vdaymdaywday > 4 && METmins > 599, 2, 1)), 1)
+    )
+  )
+
+ipaqs <- c('vday', 'mday', 'wday', 'mdaywday', 'vdaymdaywday', 'vtime', 'mtime', 'wtime', 'mtimewtime')
+
+ipaq <- ipaq %>% 
+  select(-all_of(ipaqs))
+```
+
+
+add IPAQ score
+```{r}
+demogs <- full_join(demogs, ipaq, by="subject_number")
+```
+
+change variable types to strings
+```{r}
+demographics <- demogs %>% 
+  mutate(
+    sex = ifelse(demogs$sex == 1, "male", "female"),
+    race = ifelse(demogs$race == 2, "Asian", ifelse(demogs$race == 4, "Black or African American", "White")),
+    ethnicity = ifelse(demogs$ethnicity == 98, "Unknown / not reported" , ifelse(demogs$ethnicity == 1, "Hispanic or Latino", "NOT Hispanic or Latino")),
+    smoking_status_ES = ifelse(demogs$smoking_status_ES == 1, "past smoker", ifelse(demogs$smoking_status_ES == 2, "current smoker", "never smoked")),
+    smoking_status_MHQ = ifelse(demogs$smoking_status_MHQ == 1, "past smoker", ifelse(demogs$smoking_status_MHQ == 2, "current smoker", "never smoked")),
+    antibiotics = ifelse(demogs$antibiotics == 1, "Yes", "No"),
+    IPAQscore = ifelse(demogs$IPAQscore == 1, "Inactive", ifelse(demogs$IPAQscore == 2, "Minimally active", "HEPA active"))
+  )
+```
+
+```{r}
+write.csv(demographics, "/Volumes/spakowicz/bewell/data/09-01-21_demographics.csv")
+```
+
+
+

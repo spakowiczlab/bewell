@@ -1,0 +1,195 @@
+---
+title: "on-study"
+author: "Amna Bibi and Dan Spakowicz"
+date: "11/20/2020"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+
+library(readxl)
+library(tidyverse)
+library(lubridate)
+
+source("00-paths.R")
+```
+
+```{r}
+x <- readxl::read_xlsx(file.path(paths$box, 
+                                 "participants", 
+                                 "Be Well Study Schedule.xlsx"),
+                       skip = 1, 
+                       trim_ws = TRUE,
+                       sheet = 1)
+
+head(x)
+```
+
+```{r}
+xs <- 
+  x %>%
+  select(`Subject ID`, `Consented date`, `Visit 1`, `Redoing V1`, `Visit 2`, `Visit 3`, `Redoing V3`, `Visit 4`, `Drop Out`) %>%
+    mutate(`Visit 1` = if_else(is.na(`Redoing V1`),
+                             true = `Visit 1`,
+                             false = `Redoing V1`),
+         `Visit 3` = if_else(is.na(`Redoing V3`),
+                             true = `Visit 3`,
+                             false = `Redoing V3`)) %>%
+  arrange(`Consented date`) %>%
+  mutate(id = seq(1, nrow(x))) %>%
+  select(-`Subject ID`, -starts_with("Redoing")) 
+
+summary(xs)
+```
+
+```{r}
+xsl <- 
+  xs %>%
+  gather(-id, key = "event", value = "date")
+```
+
+```{r}
+saveRDS(xsl, file.path(paths$derived, "study-dates.RDS"))
+```
+
+```{r}
+xd <- readRDS("../../data/derived/clinical_manuscript.rds")$visits
+```
+
+```{r}
+end.date <- as.POSIXct(max(xs$`Visit 1`, na.rm = TRUE) + lubridate::weeks(10))
+
+xd %>%
+  ggplot(aes(date, reorder(id, -id))) +
+  geom_point(aes(color = event)) +
+  theme_bw() +
+  theme(axis.text.y = element_blank()) +
+  geom_vline(xintercept = as.POSIXct(Sys.Date()), 
+             color = "red", linetype = "dotted") +
+  geom_vline(xintercept = end.date, 
+             color = "blue", linetype = "dotted") +
+  annotate(geom = "text", 
+           label = paste0("Study end = ", format(end.date, "%b %d")),
+           x = end.date - weeks(16), y = max(xd$id) - 3) +
+  ylab("Participant") +
+  xlab("Date") +
+  ggsave("../figures/on-study.png", height = 4, width = 6)
+```
+
+```{r}
+xw <- 
+  xd %>%
+  spread(key = "event", value = "date") %>%
+  mutate(on.study = (`Visit 4` - as.POSIXct(Sys.Date())) > 0,
+         completed = (`Visit 4` - as.POSIXct(Sys.Date())) < 0)
+
+t.on.study <- 
+  table(xw$on.study, useNA = "ifany") %>%
+  data.frame
+
+true.on.study <- t.on.study[2, 2]
+true.on.study
+```
+
+There are `r true.on.study` participants currently on study, i.e. past V1 and before V4.
+
+```{r}
+gc <- 
+  xs %>%
+  filter(is.na(`Drop Out`)) %>%
+  select(-`Consented date`,-`Drop Out`, -starts_with("Redoing")) %>%
+  gather(-id, key = "event", value = "date") %>%
+  mutate(date.passed = if_else(date < as.POSIXct(Sys.Date()),
+                               true = TRUE,
+                               false = FALSE,
+                               missing = FALSE)) %>%
+  filter(date.passed == FALSE)
+
+n.consented.on.study <- 
+  gc %>%
+  select(id) %>%
+  unique %>%
+  count
+
+n.consented.on.study
+```
+
+There are `r n.consented.on.study$n` participants currently on study, i.e. consented and before V4.
+
+# Number of participants who have completed the study
+
+```{r}
+t.completed <- 
+  xw %>%
+  count(completed)
+
+t.completed
+
+true.completed <- t.completed[2,2]
+```
+There are `r as.numeric(true.completed)` participants who have completed the study.
+
+
+
+```{r}
+left.to.complete <- 42 - (true.on.study + true.completed)
+left.to.complete
+```
+
+There are `r left.to.complete` participants left to fully completed the study.
+
+```{r}
+dropout.freq <- 0.8
+
+left.to.enroll <- left.to.complete / dropout.freq
+```
+
+With a dropout frequency of `r dropout.freq`, there are `r left.to.enroll` participants left to enroll.
+
+# Gift cards left to purchase
+
+How many gift cards do we expect to need to buy to complete the study?
+
+```{r}
+gc <- 
+  xs %>%
+  filter(is.na(`Drop Out`)) %>%
+  select(-`Consented date`,-`Drop Out`, -starts_with("Redoing")) %>%
+  gather(-id, key = "event", value = "date") %>%
+  mutate(date.passed = if_else(date < as.POSIXct(Sys.Date()),
+                               true = TRUE,
+                               false = FALSE,
+                               missing = FALSE)) %>%
+  filter(date.passed == FALSE)
+
+```
+
+```{r}
+amazon <- 31
+walmart <- 19
+
+nrow(gc) - (amazon + walmart)
+```
+
+
+# Visualizing the completeness of biospecimen collections
+
+```{r, echo=FALSE}
+y <- readxl::read_xlsx(file.path(paths$box, 
+                                 "participants", 
+                                 "Be Well Study Schedule.xlsx"),
+                       trim_ws = TRUE,
+                       sheet = 2)
+
+head(y)
+```
+
+```{r, echo=FALSE}
+z <- full_join(x, y)
+
+head(z)
+```
+
+
+

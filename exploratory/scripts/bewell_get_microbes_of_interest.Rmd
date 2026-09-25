@@ -1,0 +1,227 @@
+---
+title: "diversity"
+author: "Caroline Wheeler"
+date: "2/14/2022"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+
+library(tidyverse)
+library(reshape2)
+```
+
+read in data w/o row names
+```{r}
+king <- read.csv("../data/derived/RelAbun/RelAbun_king.csv", row.names = 1)
+phyl <- read.csv("../data/derived/RelAbun/RelAbun_phyl.csv",row.names = 1)
+class <- read.csv("../data/derived/RelAbun/RelAbun_class.csv",row.names = 1)
+ord <- read.csv("../data/derived/RelAbun/RelAbun_ord.csv", row.names = 1)
+fam <- read.csv("../data/derived/RelAbun/RelAbun_fam.csv", row.names = 1)
+gen <- read.csv("../data/derived/RelAbun/RelAbun_gen.csv", row.names = 1)
+spec <- read.csv("../data/derived/RelAbun/RelAbun_spec.csv", row.names = 1)
+```
+
+function to run wilcox test on pre/post BRB and return table of p-values
+```{r}
+run_wilcox <- function(level, str1, str2){
+  microbes <- colnames(level)
+  tableOfResults<-data.frame(var=microbes)
+  tableOfResults$p_wilcox <- NA
+  rownames(tableOfResults) <- microbes
+
+  tempR <- filter(level, grepl(str1, rownames(level)))
+  tempT <- filter(level, grepl(str2, rownames(level)))
+
+  for(mic in colnames(level)){
+    x <- tempR[, mic]
+    y <- tempT[, mic]
+    thiscommand <- paste("thiswilcox <- wilcox.test(x, y, paired = TRUE)")
+    eval(parse(text = thiscommand))
+    tableOfResults[mic, "p_wilcox"] <- thiswilcox$p.value
+}
+  tableOfResults <- tableOfResults %>% select(p_wilcox)
+  return(tableOfResults)
+}
+```
+
+function to get direction of change
+```{r}
+get_direction <- function(df, mic){
+  temp <- allMics %>%
+  group_by(time) %>%
+  summarize(mean(eval(as.name(mic))))
+  
+  dif <- as.double(temp[3,2] - temp[1,2])
+  if(dif > 0){
+    df[mic, "direction"] <- "increase"
+  }else{
+    df[mic, "direction"] <- "decrease"
+  }
+  return(df)
+}
+```
+
+BRB all levels
+```{r warning=FALSE}
+spec_dif <- run_wilcox(spec, "rB", "tB")
+gen_dif <- run_wilcox(gen, "rB", "tB")
+fam_dif <- run_wilcox(fam, "rB", "tB")
+ord_dif <- run_wilcox(ord, "rB", "tB")
+class_dif <- run_wilcox(class, "rB", "tB")
+phyl_dif <- run_wilcox(phyl, "rB", "tB")
+king_dif <- run_wilcox(king, "rB", "tB")
+
+#combine and filter to p-value < 0.05
+BRBresults <- rbind(king_dif, phyl_dif, class_dif, ord_dif, fam_dif, gen_dif, spec_dif) %>% filter(p_wilcox < 0.05)
+```
+
+Placebo all levels
+```{r warning=FALSE}
+spec_dif <- run_wilcox(spec, "rP", "tP")
+gen_dif <- run_wilcox(gen, "rP", "tP")
+fam_dif <- run_wilcox(fam, "rP", "tP")
+ord_dif <- run_wilcox(ord, "rP", "tP")
+class_dif <- run_wilcox(class, "rP", "tP")
+phyl_dif <- run_wilcox(phyl, "rP", "tP")
+king_dif <- run_wilcox(king, "rP", "tP")
+
+#combine and filter to p-value < 0.05
+resultsPlacebo <- rbind(king_dif, phyl_dif, class_dif, ord_dif, fam_dif, gen_dif, spec_dif) %>% filter(p_wilcox < 0.05)
+```
+
+add direction to BRB results table
+```{r}
+BRBresults$direction <- NA
+
+allMics <- cbind(king, phyl, class, ord, fam, gen, spec)
+  
+allMics <- allMics %>%
+  mutate(time = rownames(allMics)) %>%
+  mutate(time = substr(time, nchar(time)-1, nchar(time)))
+
+for (microbe in rownames(BRBresults)) {
+  BRBresults <- get_direction(BRBresults, microbe)
+}
+```
+
+save BRBresults
+```{r}
+write.csv(BRBresults, "../data/derived/03-28-22_BRBmicrobiomeResults.csv")
+```
+
+add direction to Placebo results table
+```{r}
+for (microbe in rownames(resultsPlacebo)) {
+  resultsPlacebo <- get_direction(resultsPlacebo, microbe)
+}
+```
+
+save Placresults
+```{r}
+write.csv(resultsPlacebo, "../data/derived/03-28-22_PlaceboMicrobiomeResults.csv")
+```
+
+<!-- Top 5 -->
+<!-- ```{r} -->
+<!-- sigMics <- rownames(results %>% arrange(p_wilcox) %>% slice(1:6)) -->
+<!-- ``` -->
+
+boxplots of significant microbes
+```{r}
+sigMics <- allMics[, which((colnames(allMics) %in% rownames(BRBresults))==TRUE)]
+sigMics <- sigMics %>%
+  mutate(time = rownames(sigMics)) %>%
+  mutate(time = substr(time, nchar(time)-1, nchar(time))) %>%
+  filter(time == "rB" | time == "tB")
+  
+sigMics <- melt(sigMics)
+
+bp <- 
+  sigMics %>%
+  ggplot(aes(x=time, y=value)) + 
+  geom_violin(aes(color = time), show.legend = FALSE) +
+  geom_boxplot(aes(fill=time), width = 0.1) + 
+  geom_jitter(alpha = 0.2, width = 0.3) +
+  xlab("") + ylab("Relative Abundance") + 
+  labs(fill = "") + 
+  theme_bw() +
+  theme(axis.text.x = element_text(angle = 45, hjust=1)) + 
+  scale_fill_manual(values=c("red3", "cornflowerblue")) + 
+  facet_wrap(. ~ variable, scales = "free", ncol = 4)
+  
+bp
+
+ggsave(filename = "../figures/aacr22_microbiomeBP.png", plot = bp, width = 12, height = 5.5, dpi = 300)
+```
+
+Summarize all microbes for visualization
+```{r}
+aml <- allMics %>%
+  rownames_to_column("id") %>%
+  separate("id", into = c("ptid", "study_visit")) %>%
+  gather(-ptid, -study_visit, key = "microbe", value = "relAbun") %>%
+  mutate(study_visit = fct_relevel(study_visit, c("rP", "tP", "rB", "tB"))) %>%
+  mutate(relAbun = as.numeric(relAbun))
+
+
+```
+
+```{r}
+aml %>%
+  filter(microbe == "s__Lachnospira_pectinoschiza") %>%
+  ggplot(aes(x = study_visit, y = relAbun)) +
+  geom_bar(stat = "identity", aes(fill = study_visit), show.legend = FALSE) +
+  scale_fill_viridis_d() +
+  theme_bw() +
+  labs(x = "",
+       y = "Relative Abundance",
+       subtitle = "Lachnospira pectinoschiza") +
+  facet_wrap(~ptid)
+
+ggsave("../figures/Lachnospira_pectinoschiza_abundance_bar_all.png",
+       height = 7.5, width = 10)
+```
+
+```{r}
+aml %>%
+  filter(microbe == "s__Blautia_obeum") %>%
+  ggplot(aes(x = study_visit, y = relAbun)) +
+  geom_bar(stat = "identity", aes(fill = study_visit), show.legend = FALSE) +
+  scale_fill_viridis_d() +
+  theme_bw() +
+  labs(x = "",
+       y = "Relative Abundance",
+       subtitle = "Blautia obeum") +
+  facet_wrap(~ptid)
+
+ggsave("../figures/Blautia_obeum_abundance_bar_all.png",
+       height = 7.5, width = 10)
+```
+
+s__Roseburia_sp_CAG_309
+
+```{r}
+plotMicrobe <- function(df, name){
+  p <- 
+    df %>%
+    filter(microbe == name) %>%
+    ggplot(aes(x = study_visit, y = relAbun)) +
+    geom_bar(stat = "identity", aes(fill = study_visit), show.legend = FALSE) +
+    scale_fill_viridis_d() +
+    theme_bw() +
+    labs(x = "",
+         y = "Relative Abundance",
+         subtitle = name) +
+    facet_wrap(~ptid)
+  p
+
+ggsave(paste0("../figures/", name, "_abundance_bar_all.png"),
+       height = 7.5, width = 10)
+  
+}
+
+plotMicrobe(aml, "s__Roseburia_sp_CAG_309")
+```
+

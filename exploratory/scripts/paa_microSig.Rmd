@@ -1,0 +1,247 @@
+---
+title: "paa_microSig"
+author: "Caroline Wheeler"
+date: '2022-12-22'
+output: html_document
+---
+
+---
+title: "paa"
+author: "Caroline Wheeler"
+date: "2022-12-21"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+
+library(tidyverse)
+library(randomForest)
+library(ggplot2)
+library(ROCR)
+library(gdata)
+```
+
+read in test data
+```{r}
+# bewell
+b_taxa <- read.csv("../data/derived/bewell_taxonomy_relAbun.csv")
+
+# fitness 
+f_taxa <- read.table("/Volumes/spakowicz/fitness/data/derived/merged_metaphlan_output.txt",
+                     header = T, stringsAsFactors = F)
+```
+
+samples wide to long 
+```{r}
+f_taxa <- gather(f_taxa, sample, relAbun, FF05466751:FF05464119, factor_key=TRUE)
+```
+
+serparate taxonomy into taxonomic levels 
+```{r}
+f_taxa <- f_taxa %>%
+  separate(clade_name, c("Kingdom", "Phylum", "Class", "Order", "Family", "Genus", "Species"), '\\|') %>%
+  rename(exo.ra = relAbun) %>%
+  mutate(microbe = ifelse(!is.na(Species), Species, 
+                          ifelse(!is.na(Genus), Genus,
+                                 ifelse(!is.na(Family), Family,
+                                        ifelse(!is.na(Order), Order,
+                                               ifelse(!is.na(Class), Class,
+                                                      ifelse(!is.na(Phylum), Phylum, Kingdom))))))) %>%
+  select(sample, microbe, exo.ra)
+
+b_taxa <- b_taxa %>%
+  separate(Taxonomy, c("Kingdom", "Phylum", "Class", "Order", "Family", "Genus", "Species"), '\\|') %>%
+  rename(exo.ra = RelAbun) %>%
+  mutate(microbe = ifelse(!is.na(Species), Species, 
+                          ifelse(!is.na(Genus), Genus,
+                                 ifelse(!is.na(Family), Family,
+                                        ifelse(!is.na(Order), Order,
+                                               ifelse(!is.na(Class), Class,
+                                                      ifelse(!is.na(Phylum), Phylum, Kingdom))))))) %>%
+  select(sample, microbe, exo.ra)
+
+```
+
+define
+```{r}
+paa_up <- c("s__Clostridium_sp_UNK-MGS-6", "s__Firmicutes_bacterium_CAG_41", "s__Coprobacillus_cateniformis", "s__Clostridia_bacterium_UC5-1-2G4","s__Streptococcus_dysgalactiae", "s__Acidaminococcus_sp_HPA0509", "s__Roseburia_sp_CAG_303", "s__Butyrivibrio_sp_AE2032", "s__Coprobacillus_sp_29-1", "s__Coprobacillus_sp_D6")
+
+paa_down <- c("s__Alistipes_sp_CAG_435", "s__Fusobacterium_hwasookii", "s__Leuconostoc_sp_DORA_2", "s__Paenibacillus_lentimorbus", "s__Fusobacterium_sp_oral_taxon_370", "s__Alcanivorax_hongdengensis", "s__Arthrobacter_sp_LS16", "s__Bacillus_sp_5B6", "s__Bacillus_velezensis", "s__Fusobacterium_sp_OBRC1")
+```
+
+Calculate signature score
+```{r}
+# Function to calculate a microbe signature given a set of up and down regulated microbes and the relAbun of sample data
+#
+# @sig_up character vector listing microbes in given signature that are up-regulated
+# @sig_down character vector listing microbes in given signature that are down-regulated
+# @taxa df containing columns 'sample', 'microbe', 'exo.ra'
+#
+getMicroSigScore <- function(sig_up, sig_down, taxa){
+  # z score transform relAbun 
+  df <- taxa %>%
+    group_by(sample) %>%
+    mutate(z_score = scale(exo.ra))
+  
+  upMics <- df %>%
+    filter(microbe %in% sig_up)
+  
+  upTotal <- length(unique(upMics$microbe))
+  
+  upMics <- upMics %>%  
+    group_by(sample) %>%
+    summarize(tempUp = sum(exo.ra))
+  
+  downMics <- df %>%
+    filter(microbe %in% sig_down)
+  
+  downTotal <- length(unique(downMics$microbe))
+  
+  downMics <- downMics %>%
+  group_by(sample) %>%
+  summarize(tempDown = sum(exo.ra))
+  
+  if(upTotal == 0 && downTotal == 0){
+    df <- data.frame(matrix(ncol = 0, nrow = 0))
+  }else if(upTotal == 0){
+    df <- downMics %>%
+      mutate(score = tempDown*(1/downTotal)) %>%
+      select(sample,score)
+  }else if(downTotal == 0){
+    df <- upMics %>%
+      mutate(score = tempUp*(1/upTotal)) %>%
+      select(sample, score)
+  }else{
+    df <- merge(upMics, downMics, by = "sample") %>%
+    mutate(score = (tempUp - tempDown)*(1/(upTotal + downTotal))) %>%
+    select(sample, score)
+  }
+  
+  return(df)
+}
+```
+
+```{r}
+fitness <- getMicroSigScore(paa_up, paa_down, f_taxa) 
+bewell <- getMicroSigScore(paa_up, paa_down, b_taxa)
+```
+
+rename
+```{r}
+fitness$project <- "fitness"
+bewell$project <- "bewell"
+
+fitness <- fitness %>%
+  rename("paaScore" = score)
+
+bewell <- bewell %>%
+  rename("paaScore" = score)
+```
+
+
+
+### test at genus level ###
+
+define paa genus mics
+```{r}
+paa_gen_up <- c("g__Clostridium", "g__Firmicutes_unclassified", "g__Coprobacillus", "g__Streptococcus", "g__Acidaminococcus", "g__Roseburia", "g__Butyrivibrio")
+
+paa_gen_down <- c("g__Alistipes", "g__Fusobacterium", "g__Leuconostoc", "g__Paenibacillus","g__Alcanivorax", "g__Arthobacter", "g__Bacillus")
+```
+
+```{r}
+fitnessGen <- getMicroSigScore(paa_gen_up, paa_gen_down, f_taxa) 
+bewellGen <- getMicroSigScore(paa_gen_up, paa_gen_down, b_taxa)
+```
+
+
+get paa logical
+
+
+if, of microbes present in data period within paa signature, all are present within sample => TRUE else => FALSE
+
+check microbes present in data
+```{r}
+flog <- f_taxa[grepl(paste(paa_up, collapse="|"), f_taxa$microbe),]
+blog <- b_taxa[grepl(paste(paa_up, collapse="|"), b_taxa$microbe),]
+flog_gen_up <- f_taxa[grepl(paste(paa_gen_up, collapse="|"), f_taxa$microbe),]
+flog_gen_down <- f_taxa[grepl(paste(paa_gen_down, collapse="|"), f_taxa$microbe),]
+blog_gen_up <-  b_taxa[grepl(paste(paa_gen_up, collapse="|"), b_taxa$microbe),]
+blog_gen_down <-  b_taxa[grepl(paste(paa_gen_down, collapse="|"), b_taxa$microbe),]
+```
+
+```{r}
+# fitness, species level, only s__Coprobacillus_cateniformis present
+fitness <- fitness %>% 
+  mutate(paaBin = ifelse(paaScore == 0, FALSE, TRUE))
+
+blog <- spread(blog, key = microbe, value = exo.ra, fill = 0)
+
+blog <- blog %>%
+  mutate(paaBin = ifelse(apply(blog == 0, 1, any), FALSE, TRUE)) %>%
+  select(sample, paaBin)
+  
+flog_gen <- rbind(flog_gen_down, flog_gen_up)
+blog_gen <- rbind(blog_gen_down, blog_gen_up)
+
+flog_gen <- spread(flog_gen, key = microbe, value = exo.ra, fill = 0)
+blog_gen <- spread(blog_gen, key = microbe, value = exo.ra, fill = 0)
+
+flog_gen <- flog_gen %>%
+  mutate(paaBin = ifelse(apply(flog_gen == 0, 1, any), FALSE, TRUE)) %>%
+  select(sample, paaBin)
+  
+blog_gen <- blog_gen %>%
+  mutate(paaBin = ifelse(apply(blog_gen == 0, 1, any), FALSE, TRUE)) %>%
+  select(sample, paaBin)
+```
+
+# Want to make this process a function, come back to
+```{r}
+# taxa <- f_taxa
+# paa <- paa_up
+# data <- fitness
+# 
+# data$paaBin <- TRUE
+# 
+# log <- taxa[grepl(paste(paa, collapse="|"), taxa$microbe),]
+# mics <- as.list(log %>% select(microbe) %>% distinct())
+```
+
+combine inro one table
+```{r}
+flog_gen <- flog_gen %>%
+  rename("paaBinGenus" = "paaBin")
+
+fitnessGen <- merge(flog_gen, fitnessGen)
+
+fitnessGen <- fitnessGen %>%
+  rename("scoreGenus" = "score")
+
+fitness <- merge(fitness, fitnessGen)
+
+fitness <- fitness %>%
+  select(sample, project, paaScore, paaBin, scoreGenus, paaBinGenus)
+
+blog_gen <- blog_gen %>%
+    rename("paaBinGenus" = "paaBin")
+
+bewellGen <- merge(blog_gen, bewellGen) %>%
+  rename("scoreGenus" = "score") 
+
+bewell <- merge(bewell, bewellGen)
+
+bewell <- merge(bewell, blog)
+
+bewell <- bewell %>%
+    select(sample, project, paaScore, paaBin, scoreGenus, paaBinGenus)
+
+paa_table <- rbind(fitness, bewell)
+```
+
+
+```{r}
+write.csv(paa_table, "../data/derived/paa_table.csv")
+```
+

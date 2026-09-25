@@ -1,0 +1,145 @@
+---
+title: "Cumulative number of bewell participants"
+author: "Shiva Jahanbakhshi"
+date: "2026-07-13"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r}
+library(tidyverse)
+library(readxl)
+
+df <- read_excel("../../data/Cumulative_participants.xlsx")
+```
+
+
+```{r}
+library(tidyverse)
+
+df_long <- df %>%
+  filter(!is.na(Month),
+         Month != "Total") %>%
+  mutate(Month = as.numeric(Month)) %>%
+  select(Month, LCSC_All, Facebook_All, ResearchMatch_All) %>%
+  pivot_longer(
+    -Month,
+    names_to = "Source",
+    values_to = "Count"
+  ) %>%
+  arrange(Source, Month) %>%
+  group_by(Source) %>%
+  mutate(Cumulative = cumsum(Count))
+
+ggplot(df_long,
+       aes(x = Month,
+           y = Cumulative,
+           fill = Source)) +
+geom_area(alpha = 0.9, color = "white", linewidth = 0.3) +
+  theme_classic() +
+  labs(
+    x = "Month",
+    y = "Cumulative participants",
+    fill = "Recruitment source"
+  ) +
+  scale_fill_manual(
+    values = c(
+      "LCSC_All" = "skyblue",
+      "Facebook_All" = "darksalmon",
+      "ResearchMatch_All" = "aquamarine"
+    )
+  )
+ggsave("../../exploratory/figures/Cumulative_participants_all.svg",
+       width = 6, height = 4)
+```
+```{r}
+df_long1 <- df %>%
+  filter(!is.na(Month),
+         Month != "Total") %>%
+  mutate(Month = as.numeric(Month)) %>%
+  select(Month, LCSC_SC, Facebook_SC, ResearchMatch_SC) %>%
+  pivot_longer(
+    -Month,
+    names_to = "Source",
+    values_to = "Count"
+  ) %>%
+  arrange(Source, Month) %>%
+  group_by(Source) %>%
+  mutate(Cumulative = cumsum(Count))
+
+ggplot(df_long1,
+       aes(x = Month,
+           y = Cumulative,
+           fill = Source)) +
+geom_area(alpha = 0.9, color = "white", linewidth = 0.3) +
+  theme_classic() +
+  labs(
+    x = "Month",
+    y = "Cumulative number of participants",
+    fill = "Recruitment source"
+  ) +
+  scale_fill_manual(
+    values = c(
+      "LCSC_SC" = "skyblue",
+      "Facebook_SC" = "darksalmon",
+      "ResearchMatch_SC" = "aquamarine"
+    )
+  )
+ggsave("../../exploratory/figures/Cumulative_participants_SC_draft.svg",
+       width = 6, height = 4)
+```
+```{r}
+df_long1 <- df %>%
+  filter(!is.na(Month),
+         Month != "Total") %>%
+  mutate(Month = as.numeric(Month)) %>%
+  select(Month, LCSC_SC, Facebook_SC, ResearchMatch_SC) %>%
+  pivot_longer(
+    -Month,
+    names_to = "Source",
+    values_to = "Count"
+  ) %>%
+  mutate(
+    Source = recode(
+      Source,
+      LCSC_SC = "LCSC",
+      Facebook_SC = "Facebook",
+      ResearchMatch_SC = "ResearchMatch"
+    )
+  ) %>%
+  arrange(Source, Month) %>%
+  group_by(Source) %>%
+  mutate(Cumulative = cumsum(Count))
+
+ggplot(df_long1,
+       aes(x = Month,
+           y = Cumulative,
+           fill = Source)) +
+  geom_area(alpha = 0.9, color = "white", linewidth = 0.3) +
+  theme_classic() +
+  theme(
+    legend.position = c(0.18, 0.82),   # inside plot (x, y)
+    legend.background = element_blank(),
+    legend.key = element_blank()
+  ) +
+  labs(
+    x = "Month",
+    y = "Cumulative number of participants",
+    fill = "Recruitment source"
+  ) +
+  scale_fill_manual(
+    values = c(
+      "LCSC" = "skyblue",
+      "Facebook" = "darksalmon",
+      "ResearchMatch" = "aquamarine"
+    )
+  )
+
+ggsave("../figures/fig2A.svg",
+       width = 6, height = 4)
+```
+
+

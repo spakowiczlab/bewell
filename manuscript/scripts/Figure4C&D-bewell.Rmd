@@ -1,0 +1,295 @@
+---
+title: "Figure 4D and 4E"
+author: "Shiva Jahanbakhshi"
+date: "2025-12-24"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r}
+library(tidyverse)
+library(readr)
+library(ggplot2)
+library(vegan)
+
+rel <- read_csv(
+  "../../data/derived/bewell_taxonomy_relAbun.csv",
+  show_col_types = FALSE
+) %>%
+  mutate(
+    Subject.Number = as.character(Subject.Number),
+    RelAbun = as.numeric(RelAbun)
+  )
+
+ipaq <- readRDS("../../data/derived/clinical_manuscript.rds")$subjects
+
+```
+
+### Figure 4D: 6-taxa representative boxplots
+```{r}
+# Prep
+rel2 <- rel %>%
+  mutate(
+    term = gsub(".*\\|", "", Taxonomy),
+    variable = factor(
+      variable,
+      levels = c("rP", "tP", "rB", "tB"),
+      labels = c("Pre Placebo", "Post Placebo", "Pre BRB", "Post BRB")
+    ),
+    pretty_taxon = gsub("_", " ", gsub("^\\w__", "", term)))
+
+# 6 taxa
+top_taxa <- c(
+  "s__Blautia_obeum",
+  "s__Eubacterium_eligens",
+  "s__Lachnospira_pectinoschiza",
+  "s__Eubacterium_rectale",
+  "g__Lachnospiraceae_unclassified",
+  "s__Parabacteroides_goldsteinii"
+)
+
+box_df <- rel2 %>% filter(term %in% top_taxa)
+
+p_box <- ggplot(box_df, aes(x = variable, y = RelAbun, fill = variable)) +
+  geom_boxplot(outlier.size = 0.5, size = 0.2) +
+  facet_wrap(~ pretty_taxon, scales = "free_y") +
+  theme_bw(base_size = 10) +
+  labs(x = "", y = "Relative abundance", fill = "") +
+  theme(
+    axis.text.x = element_text(angle = 45, hjust = 1),
+    strip.text = element_text(face = "bold"),
+    legend.position = "none"
+  )
+
+p_box
+ggsave("../figures/fig4D.svg", p_box, height = 6, width = 14)
+
+
+```
+
+### Figure 4E: baseline PCA colored by BRB effect group
+```{r}
+# Load model results and define BRB-enriched taxa (unadjusted p < 0.05)
+load("../../data/model_stats_BW.rda")  # creates model_res_BW
+
+sig_taxa <- model_res_BW %>%
+  filter(p.value < 0.05) %>%
+  pull(term) %>%
+  unique()
+
+# Combined abundance per subject for those taxa (BRB arm only rB/tB)
+rel_sig <- rel %>%
+  mutate(term = gsub(".*\\|", "", Taxonomy)) %>%
+  filter(term %in% sig_taxa, variable %in% c("rB", "tB"))
+
+combined_sig <- rel_sig %>%
+  group_by(Subject.Number, variable) %>%
+  summarise(total_abun = sum(RelAbun, na.rm = TRUE), .groups = "drop")
+
+# Define BRB effect group (>2-fold increase)
+combined_wide <- combined_sig %>%
+  pivot_wider(names_from = variable, values_from = total_abun) %>%
+  filter(!is.na(rB) & !is.na(tB)) %>%
+  mutate(
+    fold_change = (tB + 1e-6) / (rB + 1e-6),
+    brb_status  = if_else(fold_change >= 2, "altered by BRB", "not altered by BRB"),
+    brb_status  = factor(brb_status, levels = c("not altered by BRB", "altered by BRB"))
+  )
+
+# Baseline (rB) abundance table (ALL taxa) for PCA
+baseline_brb <- rel %>%
+  mutate(term = gsub(".*\\|", "", Taxonomy)) %>%
+  filter(variable == "rB") %>%
+  semi_join(combined_wide %>% select(Subject.Number), by = "Subject.Number") %>%
+  select(Subject.Number, term, RelAbun) %>%
+  pivot_wider(names_from = term, values_from = RelAbun, values_fill = 0) %>%
+  left_join(combined_wide %>% select(Subject.Number, brb_status), by = "Subject.Number") %>%
+  filter(!is.na(brb_status))
+
+# PCA
+X <- baseline_brb %>% select(-Subject.Number, -brb_status) %>% as.matrix()
+rownames(X) <- baseline_brb$Subject.Number
+pca_res <- prcomp(X, scale. = TRUE)
+
+scores <- as.data.frame(pca_res$x[, 1:2]) %>%
+  setNames(c("PC1", "PC2")) %>%
+  mutate(brb_status = baseline_brb$brb_status)
+
+# PERMANOVA p-value (Bray-Curtis on original abundances)
+otu_baseline  <- baseline_brb %>% select(-Subject.Number, -brb_status)
+meta_baseline <- baseline_brb %>% select(brb_status)
+dist_baseline <- vegdist(otu_baseline, method = "bray")
+adonis_res <- adonis2(dist_baseline ~ brb_status, data = meta_baseline)
+adonis_p <- signif(adonis_res$`Pr(>F)`[1], 2)
+
+# Plot with hulls (narrow polygons)
+hulls <- scores %>%
+  mutate(brb_status = baseline_brb$brb_status) %>%
+  group_by(brb_status) %>%
+  filter(n() >= 3) %>%
+  slice(chull(PC1, PC2)) %>%
+  ungroup()
+
+p_pca <- ggplot(scores, aes(PC1, PC2, color = brb_status)) +
+  geom_polygon(
+    data = hulls,
+    aes(PC1, PC2, fill = brb_status),
+    alpha = 0.20,
+    color = NA
+  ) +
+  geom_point(size = 3) +
+  annotate(
+    "text",
+    x = Inf, y = Inf,
+    hjust = 1.1, vjust = 1.5,
+    label = paste0("p = ", adonis_p),
+    size = 4
+  ) +
+  theme_bw() +
+  labs(color = "BRB effect group", fill = "BRB effect group")
+
+p_pca
+ggsave("../figures/fig4E.svg", p_pca, width = 6, height = 4)
+
+```
+
+
+```{r}
+# Baseline PCA scores with subject IDs
+pre_pc1 <- as.data.frame(pca_res$x[, 1:2]) %>%
+  rownames_to_column("Subject.Number") %>%
+  transmute(
+    Subject.Number = as.character(Subject.Number),
+    Pre_PC1 = PC1,
+    Pre_PC2 = PC2
+  )
+```
+
+
+
+```{r}
+post_brb <- rel %>%
+  mutate(term = gsub(".*\\|", "", Taxonomy)) %>%
+  filter(
+    variable == "tB",
+    Subject.Number %in% pre_pc1$Subject.Number
+  ) %>%
+  group_by(Subject.Number, term) %>%
+  summarise(
+    RelAbun = sum(RelAbun, na.rm = TRUE),
+    .groups = "drop"
+  ) %>%
+  pivot_wider(
+    names_from = term,
+    values_from = RelAbun,
+    values_fill = 0
+  )
+```
+
+```{r}
+activity_meta <- ipaq %>%
+  mutate(subject_number = as.character(subject_number)) %>%
+  filter(
+    subject_number %in% combined_wide$Subject.Number,
+    !is.na(IPAQscore)
+  ) %>%
+  mutate(
+    metsTotal = METwalking + METmoderate + METvig + METmins,
+    Activity = if_else(
+      IPAQscore == "HEPA active" | metsTotal >= 5000,
+      "Active",
+      "Inactive"
+    ),
+    Subject.Number = subject_number
+  ) %>%
+  select(Subject.Number, Activity) %>%
+  distinct()
+```
+
+```{r}
+adonis_meta <- post_brb %>%
+  select(Subject.Number) %>%
+  inner_join(activity_meta, by = "Subject.Number") %>%
+  inner_join(pre_pc1, by = "Subject.Number") %>%
+  filter(
+    !is.na(Activity),
+    !is.na(Pre_PC1)
+  )
+```
+
+```{r}
+table(adonis_meta$Activity)
+
+nrow(adonis_meta)
+
+anyDuplicated(adonis_meta$Subject.Number)
+```
+
+```{r}
+post_mat <- post_brb %>%
+  filter(Subject.Number %in% adonis_meta$Subject.Number) %>%
+  arrange(match(Subject.Number, adonis_meta$Subject.Number)) %>%
+  select(-Subject.Number) %>%
+  as.data.frame()
+
+rownames(post_mat) <- adonis_meta$Subject.Number
+```
+
+```{r}
+identical(
+  rownames(post_mat),
+  adonis_meta$Subject.Number
+)
+```
+
+```{r}
+post_mat <- post_mat[
+  ,
+  colSums(post_mat, na.rm = TRUE) > 0,
+  drop = FALSE
+]
+```
+
+```{r}
+post_bray <- vegdist(
+  post_mat,
+  method = "bray"
+)
+```
+
+```{r}
+adonis_activity <- adonis2(
+  post_bray ~ Activity,
+  data = adonis_meta,
+  permutations = 9999
+)
+
+adonis_activity
+```
+
+```{r}
+adonis_adjusted <- adonis2(
+  post_bray ~ Pre_PC1 + Activity,
+  data = adonis_meta,
+  permutations = 9999,
+  by = "margin"
+)
+
+adonis_adjusted
+```
+
+```{r}
+activity_dispersion <- betadisper(
+  post_bray,
+  adonis_meta$Activity
+)
+
+permutest(
+  activity_dispersion,
+  permutations = 9999
+)
+```
+

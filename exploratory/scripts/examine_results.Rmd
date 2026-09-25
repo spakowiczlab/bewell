@@ -1,0 +1,127 @@
+---
+title: "bewell_examine_results"
+author: "Caroline Wheeler"
+date: "10/19/2021"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+library(tidyverse)
+library(reshape2)
+library(ggplot2)
+library(ggfortify)
+library(RColorBrewer)
+library(ggrepel)
+
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+
+read in data and merge metaphlan results
+```{r}
+barcodes <- read.csv("../data/derived/bewell_barcodes.csv")
+
+df <- read.csv("/fs/ess/PAS1695/projects/bewell/data/bewell_taxonomy_relAbun.csv")
+```
+
+get mimic potential subjects
+```{r}
+subs <- readRDS("../../data/derived/clinical_manuscript.rds")$samples 
+subs <- na.omit(subs)
+
+keep <- melt(subs, id.vars=1:3) %>%
+  dplyr::rename("id" = value)
+
+mimic <- merge(keep, df)
+```
+
+prep for bray curtis
+need matrix with samples as rows and and species as columns
+```{r}
+mimic <- mimic %>%
+  select(id, Taxonomy, RelAbun)
+
+mimic <- dcast(mimic, id~Taxonomy)
+
+temp <- mimic[,-1]
+rownames(temp) <- mimic[,1]
+mimic <- temp
+
+mimic[is.na(mimic)] <- 0
+
+temp <- keep[,-5]
+rownames(temp) <- keep[,5]
+keep <- temp
+
+mimic <- merge(mimic, keep, by=0)
+
+temp <- mimic[,-1]
+rownames(temp) <- mimic[,1]
+mimic <- temp
+
+# #remove outliers
+# mimic<-mimic[!(rownames(mimic)=="HONC60-71-v1" | rownames(mimic)=="HONC60-71-v2"| rownames(mimic)=="HONC60-71-v3" | rownames(mimic)=="HONC60-71-v4" | 
+#                 rownames(mimic)=="HONC60-21-v1" | rownames(mimic)=="HONC60-21-v2" | rownames(mimic)=="HONC60-21-v3" | rownames(mimic)=="HONC60-21-v4"),]
+```
+
+```{r}
+mimic.pca <- prcomp(mimic[1:80], center = TRUE)
+```
+
+plot
+```{r}
+PCi<-data.frame(mimic.pca$x, subject_id=mimic$`Subject ID`, labs=mimic$variable)
+
+PCi$subject_id <- as.character(PCi$subject_id)
+PCi$labs <- as.character(PCi$labs)
+
+g <- ggplot(PCi, aes(x=PC1, y=PC2, color=subject_id)) +
+  geom_point() +
+  geom_text_repel(aes(label=labs), size=3)
+
+g
+```
+
+
+test with four samples that have all 4 stool tubs
+```{r}
+complete <- c("HONC60-55", "HONC60-84", "HONC60-95", "HONC60-96")
+
+complete_df <- df
+subs <- readRDS("../../data/derived/clinical_manuscript.rds")$samples 
+subs <- na.omit(subs)
+
+complete_subs <- subs %>%
+  filter(subs$`Subject ID` %in% complete == TRUE)
+
+complete_subs <- melt(complete_subs, id.vars=1:3) %>%
+  dplyr::rename("id" = value)
+complete_mimic <- merge(complete_subs, complete_df)
+
+complete_mimic <- complete_mimic %>%
+  select(id, Taxonomy, RelAbun)
+
+complete_mimic <- dcast(complete_mimic, id~Taxonomy)
+
+temp <- complete_mimic[,-1]
+rownames(temp) <- complete_mimic[,1]
+complete_mimic <- temp
+
+complete_mimic[is.na(complete_mimic)] <- 0
+```
+
+```{r}
+complete_mimic.pca <- prcomp(complete_mimic, center = TRUE, scale. = TRUE)
+```
+
+```{r}
+complete_PCi<-data.frame(complete_mimic.pca$x, subject_id=complete_subs$`Subject ID`, labs=complete_subs$variable)
+
+complete_PCi$subject_id <- as.character(complete_PCi$subject_id)
+complete_PCi$labs <- as.character(complete_PCi$labs)
+
+ggplot(complete_PCi, aes(x=PC1, y=PC2, color=subject_id)) +
+  geom_point() +
+  geom_text_repel(aes(label=labs), size=3)
+```
+

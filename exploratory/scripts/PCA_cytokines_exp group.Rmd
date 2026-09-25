@@ -1,0 +1,142 @@
+---
+title: "cytokines ordination grouped by treatment group"
+author: "Bailey Conrad"
+date: "`r Sys.Date()`"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+
+library(tidyverse)
+library(glmm)
+library(broom)
+library(rlist)
+library(ggrepel)
+library(ggtext)
+library(ggplot2)
+library(ggfortify)
+library(tidyr)
+library(dplyr)
+library(plotly)
+```
+
+
+```{r}
+cytokines <- read.csv("../../data/derived/cytokines_avg-results.csv")
+samplabs <- readRDS("../../data/derived/clinical_manuscript.rds")$samples
+demos <- readRDS("../../data/derived/clinical_manuscript.rds")$subjects
+```
+
+```{r}
+combine <- merge(samplabs,demos,by="Subject.ID")
+```
+
+```{r}
+samplab.form <- combine %>%
+  select(Subject.Number, placebo, Smoking.status) %>%
+  mutate(preP = ifelse(placebo == "Week 0", 1, 3), #quote bc exact string #==; is equal to operator #true = 1, false =3
+         postP = ifelse(placebo == "Week 0", 2, 4), 
+         preBRB = ifelse(placebo == "Week 0", 3, 1),
+        postBRB = ifelse(placebo == "Week 0", 4, 2)) %>%
+  pivot_longer(names_to = "Timepoint", values_to = "timepoints", cols = c("preP", "postP", "preBRB", "postBRB")) %>%
+  mutate(Sample = paste0(Subject.Number, "-", timepoints)) %>%
+  select(Sample, Timepoint, Smoking.status) %>% 
+  filter(Smoking.status=="former")
+
+
+cyto.form <- cytokines %>%
+ select(-X) %>% 
+  pivot_wider(names_from = cytokine, values_from = avg.res) %>%
+  # mutate(Sample = gsub("^0", "", Sample), Sample = gsub("\\.1$", "", Sample)) %>%
+  left_join(samplab.form) %>%
+  mutate(berry.group = ifelse(grepl("postBRB",Timepoint), 1, 0)) %>%
+  filter(Smoking.status=="former") %>%
+  subset(select = -Sample) %>%
+  mutate_at(vars(Cystatin.C), ~replace_na(.,mean(., na.rm = TRUE))) #this is setting the N/A values to the mean of that column
+```
+
+
+```{r}
+#PCA
+cyto.form.pca <- prcomp(cyto.form[1:13])
+summary(cyto.form.pca)
+```
+
+#Visualization - clustering plot
+
+```{r}
+autoplot(cyto.form.pca, data = cyto.form, label = TRUE, label.size = 3, shape = FALSE, frame = T, frame.type = "norm") +
+  theme_bw() 
+```
+
+
+```{r}
+#option 2
+autoplot(cyto.form.pca, data = cyto.form, columns = c("ALCAM.CD166", "C.Reactive.Protein.CRP", "CCL2.JE.MCP.1", "Complement.Component.C9", "Cystatin.C", "IL.1.beta.IL.1F2", "IL.10", "IL.12.IL.23.p40", "IL.6", "MMP.2", "S100A9", "TNF.alpha", "vWF.A2"), colour = "Timepoint", frame = T, frame.type = "norm") +
+  theme_bw() +
+  ggtitle("Effect of BRB Nectar on Cytokine Composition in Former Smokers", subtitle = " PCA Clustering Analysis by Experimental Groups") +
+  theme(plot.title = element_text(hjust = 0.5)) +
+  theme(plot.subtitle = element_text(hjust = 0.5)) +
+  # guides(colour=guide_legend(title="New Legend Title"))+
+  # guides(fill=guide_legend(title="New Legend Title"))
+  scale_color_discrete(breaks = c("postBRB", "postP", "preBRB", "preP"), labels = c("post-BRB", "post-placebo", "pre-BRB", "pre-placebo")) +
+  scale_fill_discrete(breaks = c("postBRB", "postP", "preBRB", "preP"), labels = c("post-BRB", "post-placebo", "pre-BRB", "pre-placebo"))
+
+
+ggsave("../figures/pca_clustering_cytokines_by experimental groups.png")
+```
+
+
+
+
+
+
+
+
+
+
+
+
+SCRATCH
+
+```{r}
+# cyto.form <- cytokines %>%
+#   select(-X) %>% 
+#   pivot_wider(names_from = cytokine, values_from = avg.res)
+# names <- cyto.form$Sample
+# cyto.form <- cyto.form[,-1]
+# row.names(cyto.form) <- names
+# cyto.pca <- prcomp(na.omit(cyto.form) , center = TRUE)
+# PCi<-data.frame(cyto.pca$x)
+# PCi %>%
+#   ggplot(aes(x=PC1, y=PC2)) +
+#            geom_point()
+```
+
+```{r}
+# cyto.pca <- prcomp(na.omit(cyto.form[2:14]), center = TRUE)
+# PCi<-data.frame(cyto.pca$x)
+```
+
+```{r}
+cyto.pca %>%
+  ggplot(aes(x=PC1, y=PC2)) +
+  theme_bw() +
+  geom_point() +
+  stat_ellipse(geom = "polygon", alpha = .3) +
+  ggtitle("Effect of BRB Nectar on Cytokine Composition in Former Smokers", subtitle = " PCA Clustering Analysis by Experimental   Groups") +
+  theme(plot.title = element_text(hjust = 0.5)) +
+  theme(plot.subtitle = element_text(hjust = 0.5))
+```
+
+
+# PCi %>%
+#   ggplot(aes(x=PC1, y=PC2)) +
+#            geom_point()
+```{r}
+PCi %>%
+  ggplot(aes(x=PC1, y=PC2)) +
+  geom_point() 
+```
+

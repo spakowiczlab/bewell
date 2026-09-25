@@ -1,0 +1,72 @@
+---
+title: "cytokines ordination grouped by smoking status"
+author: "Bailey Conrad"
+date: "`r Sys.Date()`"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+
+library(tidyverse)
+library(glmm)
+library(broom)
+library(rlist)
+library(ggrepel)
+library(ggtext)
+library(ggplot2)
+library(ggfortify)
+```
+
+```{r}
+cytokines <- read.csv("../../data/derived/cytokines_avg-results.csv", stringsAsFactors = F)
+samplabs <- readRDS("../../data/derived/clinical_manuscript.rds")$samples
+demos <- readRDS("../../data/derived/clinical_manuscript.rds")$subjects
+```
+
+```{r}
+combine <- merge(samplabs,demos,by="Subject.ID")
+```
+
+
+```{r}
+samplab.form <- combine %>%
+  select(Subject.Number, placebo, Smoking.status) %>%
+  mutate(preP = ifelse(placebo == "Week 0", 1, 3), #quote bc exact string #==; is equal to operator #true = 1, false =3
+         postP = ifelse(placebo == "Week 0", 2, 4), 
+         preBRB = ifelse(placebo == "Week 0", 3, 1),
+        postBRB = ifelse(placebo == "Week 0", 4, 2)) %>%
+  pivot_longer(names_to = "timepoint.label", values_to = "timepoints", cols = c("preP", "postP", "preBRB", "postBRB")) %>%
+  mutate(Sample = paste0(Subject.Number, "-", timepoints)) %>%
+  select(Sample, timepoint.label, Smoking.status) 
+
+
+cyto.form <- cytokines %>%
+ select(-X) %>% pivot_wider(names_from = cytokine, values_from = avg.res) %>%
+  mutate(Sample = gsub("^0", "", Sample), Sample = gsub("\\.1$", "", Sample)) %>%
+  left_join(samplab.form) %>%
+  mutate(berry.group = ifelse(grepl("postBRB",timepoint.label), 1, 0)) %>%
+  subset(select = -Sample) %>%
+  mutate_at(vars(Cystatin.C), ~replace_na(.,mean(., na.rm = TRUE))) %>%
+  na.omit()
+```
+
+
+```{r PCA of cleaned up data file}
+#PCA
+cyto.form.pca <- prcomp(cyto.form[1:13])
+summary(cyto.form.pca)
+```
+
+```{r}
+#option 2
+autoplot(cyto.form.pca, data = cyto.form, columns = c("ALCAM.CD166", "C.Reactive.Protein.CRP", "CCL2.JE.MCP.1", "Complement.Component.C9", "Cystatin.C", "IL.1.beta.IL.1F2", "IL.10", "IL.12.IL.23.p40", "IL.6", "MMP.2", "S100A9", "TNF.alpha", "vWF.A2"), colour = "Smoking.status", frame = TRUE, frame.type = "norm") +
+  theme_bw() +
+  ggtitle("Effect of BRB Nectar on Cytokine Composition", subtitle = " PCA Clustering Analysis by Smoking Status") +
+  theme(plot.title = element_text(hjust = 0.5)) +
+  theme(plot.subtitle = element_text(hjust = 0.5)) +
+   scale_color_discrete(name = "Smoking Status") +
+  scale_fill_discrete(name = "Smoking Status")
+
+ggsave("../figures/pca_clustering_cytokines_by smoking status.png")
+```

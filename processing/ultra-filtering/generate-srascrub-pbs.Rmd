@@ -1,0 +1,53 @@
+---
+title: "sra scrub pbs"
+author: "Caroline Wheeler"
+date: "8/20/2024"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+
+library(tidyverse)
+```
+
+## get sample names
+```{r cars}
+fastq.dir <- "/fs/ess/PAS1695/projects/bewell/data/fastqs/fastp"
+
+all.files <- list.files(fastq.dir)
+
+snames <- gsub(".fastq", "", all.files)
+```
+
+qsub -t 0-{x} fastp.pbs
+```{r}
+
+fileOut<-file(paste0("/fs/ess/PAS1695/projects/bewell/scripts/pbs/bewell-srascrub.pbs"))
+  
+fastq <- paste0(fastq.dir, "/${snames[$PBS_ARRAY_INDEX]}.fastq")
+ 
+writeLines(c(paste0("#PBS -N bewell-srascrub"),
+               "#PBS -l walltime=1:00:00",
+               "#PBS -l nodes=1:ppn=28",
+               "#PBS -j oe",
+               "#PBS -m ae",
+               "#PBS -A PAS1695",
+               "",
+               
+               #List sample naames in a way that can be indexed
+               paste0("snames=('", paste(snames, collapse = "' '"), "')"),
+               
+               "",
+               "cd /users/PAS1695/whee57/Github/sra-human-scrubber",
+               "",
+          
+               paste0("./scripts/scrub.sh -i ", fastq, 
+                      " -o - -p 8 /fs/ess/PAS1695/projects/bewell/data/fastqs/sra-scrubbed/${snames[$PBS_ARRAY_INDEX]}.fastq 2> /fs/ess/PAS1695/projects/bewell/scripts/logs/srasrub-${snames[$PBS_ARRAY_INDEX]}.log")
+               
+  ),
+  
+  fileOut
+  )
+```
+

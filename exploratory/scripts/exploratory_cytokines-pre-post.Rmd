@@ -1,0 +1,97 @@
+---
+title: "Cytokines pre/post BRB"
+author: "Rebecca Hoyd"
+date: "3/1/2022"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+
+library(tidyverse)
+```
+
+# Load data
+
+```{r}
+cytokines <- read.csv("../data/derived/cytokines_avg-results.csv", stringsAsFactors = F)
+
+samplabs <- readRDS("../../data/derived/clinical_manuscript.rds")$samples
+```
+
+
+# Format
+
+```{r}
+samplab.form <- samplabs %>%
+  select(Subject.Number, placebo)
+cyto.form <- cytokines %>%
+  separate(Sample, into = c("Subject.Number", "timepoint"), sep = "-") %>%
+  mutate(Subject.Number = as.numeric(gsub("^0", "", Subject.Number)),
+         timepoint = gsub("\\.1", "", timepoint)) %>%
+  left_join(samplab.form) %>%
+  mutate(study.tpoint = case_when(placebo == "Week 0" & timepoint == "1" ~ "pre.P",
+                                  placebo == "Week 0" & timepoint == "2" ~ "post.P",
+                                  placebo == "Week 0" & timepoint == "3" ~ "pre.BRB",
+                                  placebo == "Week 0" & timepoint == "4" ~ "post.BRB",
+                                  placebo == "Week 6" & timepoint == "3" ~ "pre.P",
+                                  placebo == "Week 6" & timepoint == "4" ~ "post.P",
+                                  placebo == "Week 6" & timepoint == "1" ~ "pre.BRB",
+                                  placebo == "Week 6" & timepoint == "2" ~ "post.BRB")) %>%
+  filter(grepl("BRB", study.tpoint)) %>%
+  select(Subject.Number, study.tpoint, cytokine, avg.res) %>%
+  spread(key = study.tpoint, value = avg.res)
+```
+
+```{r}
+check.norm.dists <- cyto.form %>%
+  mutate(dif.brb = post.BRB - pre.BRB) %>%
+  group_by(cytokine) %>%
+  mutate(norm.test = shapiro.test(dif.brb)$p.value) %>%
+  ungroup() %>%
+  select(cytokine, norm.test) %>%
+  distinct()
+
+norm.pass <- filter(check.norm.dists, norm.test > 0.05)$cytokine
+norm.fail <- filter(check.norm.dists, norm.test < 0.05)$cytokine
+```
+
+# Run T tests
+
+```{r}
+run_cyto_ttest <- function(x){
+  tmp <- cyto.form %>%
+    filter(cytokine == x)
+  
+  t.test(tmp$pre.BRB, tmp$post.BRB, paired = T)
+}
+```
+
+```{r}
+norm.ttests <- lapply(norm.pass, function(x) run_cyto_ttest(x))
+names(norm.ttests) <- norm.pass
+```
+
+```{r}
+norm.ttests
+```
+
+# Run Wilcoxon tests
+
+```{r}
+run_cyto_wilcox <- function(x){
+  tmp <- cyto.form %>%
+    filter(cytokine == x)
+  
+  wilcox.test(tmp$pre.BRB, tmp$post.BRB, paired = T)
+}
+```
+
+```{r}
+nonnorm.tests <- lapply(norm.fail, function(x) run_cyto_wilcox(x))
+names(nonnorm.tests) <- norm.fail
+```
+
+```{r}
+nonnorm.tests
+```

@@ -1,0 +1,97 @@
+---
+title: "Akkermansia diff check"
+author: "Dan Spakowicz"
+date: "11/10/2021"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+
+library(tidyverse)
+```
+
+```{r data}
+x <- read_csv("../data/derived/bewell_akkermansia.csv")
+```
+```{r}
+y <- 
+  x %>%
+  mutate(BRB = tB - rB,
+         Plac = tP - rP) %>%
+  select(Subject.ID, BRB, Plac) %>%
+  gather(-Subject.ID, 
+         key = "treatment", 
+         value = "rel.abun") %>%
+  mutate(trt.bin = if_else(treatment == "BRB",
+                           true = 1,
+                           false = 0))
+```
+
+
+```{r}
+y %>%
+  ggplot(aes(x = rel.abun)) +
+  geom_density(aes(fill = treatment), alpha = 0.3) +
+  theme_bw() +
+  labs(x = "Change in Akkermansia Relative Abundance",
+       y = "Density")
+ggsave("../figures/Akk-diff-check.png",
+       height = 3, width = 5)
+```
+
+```{r}
+var.test(rel.abun ~ treatment, data = y)
+
+t.test(rel.abun ~ treatment, data = y)
+
+wilcox.test(rel.abun ~ treatment, data = y)
+
+logit <- 
+  glm(trt.bin ~ rel.abun, 
+    family = "binomial",
+    data = y)
+
+summary(logit)
+```
+
+```{r}
+y %>%
+  arrange(-rel.abun) %>%
+  filter(treatment == "BRB")
+
+```
+
+```{r}
+x %>%
+  filter(Subject.ID == "HONC60-62") %>%
+  gather(-Subject.ID, key = "study_visit", value = "relAbun") %>%
+  mutate(study_visit = fct_relevel(study_visit, c("rP", "tP", "rB", "tB"))) %>%
+  ggplot(aes(x = study_visit, y = relAbun)) +
+  geom_bar(stat = "identity", aes(fill = study_visit), show.legend = FALSE) +
+  scale_fill_viridis_d() +
+  theme_bw() +
+  labs(x = "",
+       y = "Akkermansia Relative Abundance")
+
+ggsave("../figures/Akk_abundance_62.png",
+       height = 3, width = 4)
+```
+
+```{r}
+x %>%
+  gather(-Subject.ID, key = "study_visit", value = "relAbun") %>%
+  mutate(study_visit = fct_relevel(study_visit, c("rP", "tP", "rB", "tB"))) %>%
+  ggplot(aes(x = study_visit, y = relAbun)) +
+  geom_bar(stat = "identity", aes(fill = study_visit), show.legend = FALSE) +
+  scale_fill_viridis_d() +
+  theme_bw() +
+  labs(x = "",
+       y = "Akkermansia Relative Abundance") +
+  facet_wrap(~Subject.ID, scales = "free")
+
+ggsave("../figures/Akk_abundance_bar_all.png",
+       height = 7.5, width = 10)
+```
+
+

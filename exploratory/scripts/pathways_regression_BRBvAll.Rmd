@@ -1,0 +1,71 @@
+---
+title: "regression_pathways_BRBv1"
+author: "Rebecca Hoyd"
+date: "`r Sys.Date()`"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+library(tidyverse)
+# library(ggrepel)
+# library(ggtext)
+# library(vegan)
+library(stringr)
+library(broom)
+library(rlist)
+```
+
+# Load data
+
+```{r}
+pathways <- read.csv("../data/2024-02-01_humann3-aggregate.csv")
+samplabs <- readRDS("../../data/derived/clinical_manuscript.rds")$samples
+sampconv <- read.csv("/fs/ess/PAS1695/projects/bewell/data/participants/bewell_barcodes.csv") 
+```
+
+# Functions
+
+```{r}
+capture.models.univ.former <- function(outcome, lfun, mics, modin){
+  mods.list <- lapply(mics, function(x)  try({glm(as.formula(paste0(outcome, " ~ ", x)), family = lfun, data = modin) %>% tidy()}))
+  mods.list.clean <- list.clean(mods.list, function(x) is.null(x))
+  mods.df <- bind_rows(mods.list.clean)
+  return(mods.df)
+}
+```
+
+# Format model input
+
+```{r}
+paths.long <- pathways %>%
+  filter(Pathway != "UNMAPPED" & !grepl("UNINT", Pathway)) %>%
+  mutate(path.unstrat = gsub("\\|.*", "", Pathway)) %>%
+  group_by(sample, path.unstrat) %>%
+  summarise(PathAbun = sum(PathAbun)) %>%
+  pivot_wider(names_from = "path.unstrat", values_from = "PathAbun", values_fill = 0)
+names(paths.long) <- make.names(names(paths.long))
+paths <- colnames(paths.long)[-1]
+
+# pathvars <- unlist(lapply(paths.long[,-1], var))
+# pathrem <- pathvars == 0
+```
+
+```{r}
+modin <- samplabs %>%
+  pivot_longer(names_to = "Timepoint", values_to = "id", cols = c("rP", "tP", "rB", "tB"))%>%
+  inner_join(sampconv) %>%
+  mutate(berry.group = ifelse(Timepoint == "tB", 1, 0)) %>%
+  left_join(paths.long)
+```
+
+# Logistic regressions
+
+```{r}
+log.res <- capture.models.univ.former("berry.group", "binomial", paths, modin = modin) %>%
+  filter(term != "(Intercept)") %>%
+  mutate(padj = p.adjust(p.value)) %>%
+  arrange(p.value)
+
+write.csv(log.res, "../data/derived/glm_binomial_pathways-berrygroup.csv")
+```
+

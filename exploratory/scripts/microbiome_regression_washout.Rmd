@@ -1,0 +1,175 @@
+---
+title: "microbiome_regression_washout"
+author: "Bailey Conrad"
+date: "`r Sys.Date()`"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+library(tidyverse)
+library(ggrepel)
+library(ggtext)
+library(ggplot2)
+library(ggpubr)
+library(vegan)
+library(naniar)
+```
+
+```{r}
+king <- read.csv("../../data/derived/RelAbun/RelAbun_king.csv")
+phyl <- read.csv("../../data/derived/RelAbun/RelAbun_phyl.csv")
+class <- read.csv("../../data/derived/RelAbun/RelAbun_class.csv")
+ord <- read.csv("../../data/derived/RelAbun/RelAbun_ord.csv")
+fam <- read.csv("../../data/derived/RelAbun/RelAbun_fam.csv")
+gen <- read.csv("../../data/derived/RelAbun/RelAbun_gen.csv")
+spec <- read.csv("../../data/derived/RelAbun/RelAbun_spec.csv")
+samplabs <- readRDS("../../data/derived/clinical_manuscript.rds")$samples
+```
+
+```{r}
+samplab.form <- samplabs %>%
+  select(Subject.Number, Subject.ID, placebo) %>%
+  mutate(rP = ifelse(placebo == "Week 0", 1, 3),
+        tP = ifelse(placebo == "Week 0", 2, 4),
+        rB = ifelse(placebo == "Week 0", 3, 1),
+        tB = ifelse(placebo == "Week 0", 4, 2)) %>%
+  pivot_longer(names_to = "Timepoint", values_to = "timepoints", cols = c("rP", "tP", "rB", "tB")) %>%
+  mutate(Sample = paste0(Subject.Number, "-", Timepoint)) %>%
+  filter(placebo == "Week 6")
+```
+
+```{r}
+capture.models.univ.former <- function(outcome, lfun, mics, modin){
+  mods.list <- lapply(mics, function(x)  try({glm(as.formula(paste0(outcome, " ~ ", x)), family = lfun, data = modin) %>% tidy()}))
+  mods.list.clean <- list.clean(mods.list, function(x) is.null(x))
+  mods.df <- bind_rows(mods.list.clean)
+  return(mods.df)
+}
+```
+
+```{r}
+format_and_model <- function(tmp){
+ tmp.mics <- colnames(tmp)
+tmp.form <- tmp %>%
+  rownames_to_column(var = "sample") %>%
+  mutate(berry.group = ifelse(grepl("rB|tP", sample), 0, 1)) 
+res <- capture.models.univ.former("berry.group", "binomial", tmp.mics, tmp.form) %>%
+  filter(term !="(Intercept)")
+return(res)
+}
+```
+
+```{r}
+#CLASS
+names(class)[names(class) == 'X'] <- 'Sample'
+
+class.v1<-merge(samplab.form,class,by="Sample") %>%
+  filter(placebo == "Week 6") %>%
+  column_to_rownames(var="Sample") %>%
+  select(6:27)
+```
+
+```{r}
+#FAMILY
+names(fam)[names(fam) == 'X'] <- 'Sample'
+
+fam.v1<-merge(samplab.form,fam,by="Sample") %>%
+  filter(placebo == "Week 6") %>%
+  column_to_rownames(var="Sample") %>%
+  select(6:57)
+```
+
+```{r}
+#GENUS
+names(gen)[names(gen) == 'X'] <- 'Sample'
+
+gen.v1<-merge(samplab.form,gen,by="Sample") %>%
+  filter(placebo == "Week 6") %>%
+  column_to_rownames(var="Sample") %>%
+  select(6:126)
+```
+
+```{r}
+#KINGDOM
+names(king)[names(king) == 'X'] <- 'Sample'
+
+king.v1<-merge(samplab.form,king,by="Sample") %>%
+  filter(placebo == "Week 6") %>%
+  column_to_rownames(var="Sample") %>%
+   select(6:7)
+```
+
+```{r}
+#ORDER
+names(ord)[names(ord) == 'X'] <- 'Sample'
+
+ord.v1<-merge(samplab.form,ord,by="Sample") %>%
+  filter(placebo == "Week 6") %>%
+  column_to_rownames(var="Sample") %>%
+  select(6:37)
+```
+
+```{r}
+#PHYLUM
+names(phyl)[names(phyl) == 'X'] <- 'Sample'
+
+phyl.v1<-merge(samplab.form,phyl,by="Sample") %>%
+  filter(placebo == "Week 6") %>%
+  column_to_rownames(var="Sample") %>%
+  select(6:16)
+```
+
+```{r}
+#SPECIES
+names(spec)[names(spec) == 'X'] <- 'Sample'
+
+spec.v1<-merge(samplab.form,spec,by="Sample") %>%
+  filter(placebo == "Week 6") %>%
+  column_to_rownames(var="Sample") %>%
+  select(6:299)
+```
+
+```{r warning = FALSE}
+all_tax_levs <- list(king.v1, phyl.v1, class.v1, ord.v1, fam.v1, gen.v1, spec.v1)
+
+all_mod_res <- lapply(all_tax_levs, format_and_model) %>%
+  bind_rows() %>%
+  arrange(p.value)
+```
+
+```{r warning = FALSE}
+all_mod_res %>%
+  separate(term, into = c("TaxaLevel", "term"), sep = "__") %>%
+  mutate(TaxaLevel = if_else(grepl("k", TaxaLevel),
+                                   true = "Kingdom",
+                                   false = if_else(grepl("p", TaxaLevel),
+                                   true = "Phylum",
+                                   false = if_else(grepl("c", TaxaLevel),
+                                   true = "Class",
+                                   false = if_else(grepl("o", TaxaLevel),
+                                   true = "Order",
+                                   false = if_else(grepl("f", TaxaLevel),
+                                   true = "Family",
+                                   false = if_else(grepl("g", TaxaLevel),
+                                   true = "Genus",
+                                   false = if_else(grepl("s", TaxaLevel),
+                                   true = "Species",
+                                   false = TaxaLevel
+                                   )))))))) %>%
+  mutate(TaxaLevel = fct_relevel(TaxaLevel, c("Kingdom", "Phylum", "Class", "Order", "Family", "Genus", "Species"))) %>%
+  mutate(pointlabs = ifelse(p.value < 0.105, term, NA)) %>%
+  mutate(pointlabs = gsub("_", " ", pointlabs)) %>%
+  
+ggplot(aes(x = estimate, y = -log(p.value), label = pointlabs, color = TaxaLevel)) +
+  ylim(0, 5) +
+  geom_point() +
+  theme_bw(base_size = 18) +
+  labs(x = "Estimate", y = "-log(p-value)") +
+  geom_label_repel(show.legend=F) +
+  theme(plot.title = element_text(hjust = 0.5)) +
+  scale_color_viridis_d(option = "turbo", name = "Taxonomic Level")
+```
+
+```{r}
+head(all_mod_res)
+```

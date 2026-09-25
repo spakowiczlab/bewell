@@ -1,0 +1,353 @@
+---
+title: "2_microbes_by_smoking_status"
+author: "Bailey Conrad"
+date: "`r Sys.Date()`"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+
+library(tidyverse)
+library(glmm)
+library(broom)
+library(rlist)
+library(ggrepel)
+library(ggtext)
+library(ggplot2)
+library(patchwork)
+library(ggpubr)
+```
+
+```{r}
+king <- read.csv("../../data/derived/RelAbun/RelAbun_king.csv")
+phyl <- read.csv("../../data/derived/RelAbun/RelAbun_phyl.csv")
+class <- read.csv("../../data/derived/RelAbun/RelAbun_class.csv")
+ord <- read.csv("../../data/derived/RelAbun/RelAbun_ord.csv")
+fam <- read.csv("../../data/derived/RelAbun/RelAbun_fam.csv")
+gen <- read.csv("../../data/derived/RelAbun/RelAbun_gen.csv")
+spec <- read.csv("../../data/derived/RelAbun/RelAbun_spec.csv")
+demos <- readRDS("../../data/derived/clinical_manuscript.rds")$subjects
+samplabs <- readRDS("../../data/derived/clinical_manuscript.rds")$samples
+```
+
+```{r}
+combine <- merge(samplabs,demos,by="Subject.ID")
+
+samplab.form <- combine %>%
+  select(Subject.Number, placebo, Smoking.status) %>%
+  mutate(rP = ifelse(placebo == "Week 0", 1, 3), 
+        tP = ifelse(placebo == "Week 0", 2, 4), 
+        rB = ifelse(placebo == "Week 0", 3, 1),
+        tB = ifelse(placebo == "Week 0", 4, 2)) %>%
+  pivot_longer(names_to = "Timepoint", values_to = "timepoints", cols = c("rP", "tP", "rB", "tB")) %>%
+  mutate(Sample = paste0(Subject.Number, "-", Timepoint)) %>%
+  select(Sample, Smoking.status)
+```
+
+
+```{r}
+capture.models.univ.former <- function(outcome, lfun, mics, modin){
+  mods.list <- lapply(mics, function(x)  try({glm(as.formula(paste0(outcome, " ~ ", x)), family = lfun, data = modin) %>% tidy()}))
+  mods.list.clean <- list.clean(mods.list, function(x) is.null(x))
+  mods.df <- bind_rows(mods.list.clean)
+  return(mods.df)
+}
+```
+
+```{r}
+format_and_model_former <- function(tmp){
+ tmp.mics <- colnames(tmp)
+tmp.form <- tmp %>%
+  rownames_to_column(var = "sample") %>%
+  mutate(berry.group = ifelse(grepl("tB",sample), 1, 0)) 
+res <- capture.models.univ.former("berry.group", "binomial", tmp.mics, tmp.form) %>%
+  filter(term !="(Intercept)")
+return(res)
+}
+```
+
+#FORMER SMOKERS DATA MANIPULATION
+```{r}
+#CLASS
+names(class)[names(class) == 'X'] <- 'Sample'
+
+class.former<-merge(samplab.form,class,by="Sample") %>%
+  filter(Smoking.status=="former") %>%
+  select(1, 3:24) %>%
+  remove_rownames %>% 
+  column_to_rownames(var="Sample")
+```
+
+```{r}
+#FAMILY
+names(fam)[names(fam) == 'X'] <- 'Sample'
+
+fam.former<-merge(samplab.form,fam,by="Sample") %>%
+  filter(Smoking.status=="former") %>%
+  select(1, 3:54) %>%
+  remove_rownames %>% 
+  column_to_rownames(var="Sample")
+```
+
+```{r}
+#GENUS
+names(gen)[names(gen) == 'X'] <- 'Sample'
+
+gen.former<-merge(samplab.form,gen,by="Sample") %>%
+  filter(Smoking.status=="former") %>%
+   select(1, 3:123) %>%
+  remove_rownames %>% 
+  column_to_rownames(var="Sample")
+```
+
+```{r}
+#KINGDOM
+names(king)[names(king) == 'X'] <- 'Sample'
+
+king.former<-merge(samplab.form,king,by="Sample") %>%
+  filter(Smoking.status=="former") %>%
+   select(1, 3:4) %>%
+  remove_rownames %>% 
+  column_to_rownames(var="Sample")
+```
+ 
+```{r}
+#ORDER
+names(ord)[names(ord) == 'X'] <- 'Sample'
+
+ord.former<-merge(samplab.form,ord,by="Sample") %>%
+  filter(Smoking.status=="former") %>%
+   select(1, 3:34) %>%
+  remove_rownames %>% 
+  column_to_rownames(var="Sample")
+```
+ 
+```{r}
+#PHYLUM
+names(phyl)[names(phyl) == 'X'] <- 'Sample'
+
+phyl.former<-merge(samplab.form,phyl,by="Sample") %>%
+  filter(Smoking.status=="former") %>%
+   select(1, 3:13) %>%
+  remove_rownames %>% 
+  column_to_rownames(var="Sample")
+```
+ 
+```{r}
+#SPECIES
+names(spec)[names(spec) == 'X'] <- 'Sample'
+
+spec.former<-merge(samplab.form,spec,by="Sample") %>%
+  filter(Smoking.status=="former") %>%
+   select(1, 3:296) %>%
+  remove_rownames %>% 
+  column_to_rownames(var="Sample")
+```
+
+```{r warning = FALSE}
+all_tax_levs_former <- list(king.former, phyl.former, class.former, ord.former, fam.former, gen.former, spec.former)
+
+all_mod_res_former <- lapply(all_tax_levs_former, format_and_model_former) %>%
+  bind_rows() %>%
+  arrange(p.value)
+```
+
+```{r warning = FALSE}
+former <- all_mod_res_former %>%
+  separate(term, into = c("TaxaLevel", "term"), sep = "__") %>%
+  mutate(TaxaLevel = if_else(grepl("k", TaxaLevel),
+                                   true = "Kingdom",
+                                   false = if_else(grepl("p", TaxaLevel),
+                                   true = "Phylum",
+                                   false = if_else(grepl("c", TaxaLevel),
+                                   true = "Class",
+                                   false = if_else(grepl("o", TaxaLevel),
+                                   true = "Order",
+                                   false = if_else(grepl("f", TaxaLevel),
+                                   true = "Family",
+                                   false = if_else(grepl("g", TaxaLevel),
+                                   true = "Genus",
+                                   false = if_else(grepl("s", TaxaLevel),
+                                   true = "Species",
+                                   false = TaxaLevel
+                                   )))))))) %>%
+  mutate(TaxaLevel = fct_relevel(TaxaLevel, c("Kingdom", "Phylum", "Class", "Order", "Family", "Genus", "Species"))) %>%
+  mutate(pointlabs = ifelse(p.value < 0.105, term, NA)) %>%
+  mutate(pointlabs = gsub("_", " ", pointlabs)) %>%
+  
+ggplot(aes(x = estimate, y = -log(p.value), label = pointlabs, color = TaxaLevel)) +
+  ylim(0, 5) +
+  geom_point() +
+  theme_bw(base_size = 18) +
+  labs(x = "Estimate", y = "-log(p-value)") +
+  geom_hline(yintercept = 2.0)+
+  scale_x_log10() +
+  geom_label_repel(show.legend=F) +
+  # scale_color_discrete(name = "Taxonomic Level", breaks = c("k", "p", "c", "o", "f", "g", "s"), labels = c("Kingdom", "Phylum", "Class", "Order", "Family", "Genus", "Species"))+
+  theme(legend.position="none")+
+  ggtitle("Former Smokers") +
+  theme(plot.title = element_text(hjust = 0.5)) +
+  scale_color_viridis_d(option = "turbo", name = "Taxonomic Level")
+
+former
+```
+
+```{r}
+capture.models.univ.current <- function(outcome, lfun, mics, modin){
+  mods.list <- lapply(mics, function(x)  try({glm(as.formula(paste0(outcome, " ~ ", x)), family = lfun, data = modin) %>% tidy()}))
+  mods.list.clean <- list.clean(mods.list, function(x) is.null(x))
+  mods.df <- bind_rows(mods.list.clean)
+  return(mods.df)
+}
+```
+
+```{r}
+format_and_model_current <- function(tmp){
+ tmp.mics <- colnames(tmp)
+tmp.form <- tmp %>%
+  rownames_to_column(var = "sample") %>%
+  mutate(berry.group = ifelse(grepl("tB",sample), 1, 0)) 
+res <- capture.models.univ.current("berry.group", "binomial", tmp.mics, tmp.form) %>%
+  filter(term !="(Intercept)")
+return(res)
+}
+```
+
+#FORMER SMOKERS DATA MANIPULATION
+```{r}
+#CLASS
+names(class)[names(class) == 'X'] <- 'Sample'
+
+class.current<-merge(samplab.form,class,by="Sample") %>%
+  filter(Smoking.status=="current") %>%
+  select(1, 3:24) %>%
+  remove_rownames %>% 
+  column_to_rownames(var="Sample")
+```
+
+```{r}
+#FAMILY
+names(fam)[names(fam) == 'X'] <- 'Sample'
+
+fam.current<-merge(samplab.form,fam,by="Sample") %>%
+  filter(Smoking.status=="current") %>%
+  select(1, 3:54) %>%
+  remove_rownames %>% 
+  column_to_rownames(var="Sample")
+```
+
+```{r}
+#GENUS
+names(gen)[names(gen) == 'X'] <- 'Sample'
+
+gen.current<-merge(samplab.form,gen,by="Sample") %>%
+  filter(Smoking.status=="current") %>%
+   select(1, 3:123) %>%
+  remove_rownames %>% 
+  column_to_rownames(var="Sample")
+```
+
+```{r}
+#KINGDOM
+names(king)[names(king) == 'X'] <- 'Sample'
+
+king.current<-merge(samplab.form,king,by="Sample") %>%
+  filter(Smoking.status=="current") %>%
+   select(1, 3:4) %>%
+  remove_rownames %>% 
+  column_to_rownames(var="Sample")
+```
+ 
+```{r}
+#ORDER
+names(ord)[names(ord) == 'X'] <- 'Sample'
+
+ord.current<-merge(samplab.form,ord,by="Sample") %>%
+  filter(Smoking.status=="current") %>%
+   select(1, 3:34) %>%
+  remove_rownames %>% 
+  column_to_rownames(var="Sample")
+```
+ 
+```{r}
+#PHYLUM
+names(phyl)[names(phyl) == 'X'] <- 'Sample'
+
+phyl.current<-merge(samplab.form,phyl,by="Sample") %>%
+  filter(Smoking.status=="current") %>%
+   select(1, 3:13) %>%
+  remove_rownames %>% 
+  column_to_rownames(var="Sample")
+```
+ 
+```{r}
+#SPECIES
+names(spec)[names(spec) == 'X'] <- 'Sample'
+
+spec.current<-merge(samplab.form,spec,by="Sample") %>%
+  filter(Smoking.status=="current") %>%
+   select(1, 3:296) %>%
+  remove_rownames %>% 
+  column_to_rownames(var="Sample")
+```
+
+```{r warning = FALSE}
+all_tax_levs_current <- list(king.current, phyl.current, class.current, ord.current, fam.current, gen.current, spec.current)
+
+all_mod_res_current <- lapply(all_tax_levs_current, format_and_model_current) %>%
+  bind_rows() %>%
+  arrange(p.value)
+```
+
+```{r warning = FALSE}
+current <- all_mod_res_current %>%
+ separate(term, into = c("TaxaLevel", "term"), sep = "__") %>%
+  mutate(TaxaLevel = if_else(grepl("k", TaxaLevel),
+                                   true = "Kingdom",
+                                   false = if_else(grepl("p", TaxaLevel),
+                                   true = "Phylum",
+                                   false = if_else(grepl("c", TaxaLevel),
+                                   true = "Class",
+                                   false = if_else(grepl("o", TaxaLevel),
+                                   true = "Order",
+                                   false = if_else(grepl("f", TaxaLevel),
+                                   true = "Family",
+                                   false = if_else(grepl("g", TaxaLevel),
+                                   true = "Genus",
+                                   false = if_else(grepl("s", TaxaLevel),
+                                   true = "Species",
+                                   false = TaxaLevel
+                                   )))))))) %>%
+  mutate(TaxaLevel = fct_relevel(TaxaLevel, c("Kingdom", "Phylum", "Class", "Order", "Family", "Genus", "Species"))) %>%
+  mutate(pointlabs = ifelse(p.value < 0.105, term, NA)) %>%
+  mutate(pointlabs = gsub("_", " ", pointlabs)) %>%
+  
+ggplot(aes(x = estimate, y = -log(p.value), label = pointlabs, color = TaxaLevel)) +
+  ylim(0, 5) +
+  geom_point() +
+  theme_bw(base_size = 18) +
+  labs(x = "Estimate", y = "-log(p-value)") +
+  geom_hline(yintercept = 2.0) +
+  scale_x_log10() +
+  geom_label_repel(show.legend = F) +
+  ggtitle("Current Smokers") +
+  theme(plot.title = element_text(hjust = 0.5)) +
+  scale_color_viridis_d(option = "turbo", name = "Taxonomic Level")
+
+current
+```
+
+```{r warning = FALSE}
+ggp_all <- (former + current) %>%
+  ggarrange(common.legend = TRUE, legend="bottom") +
+  # scale_color_discrete(name = "Taxonomic Level", breaks = c("k", "p", "c", "o", "f", "g", "s"), labels = c("Kingdom", "Phylum", "Class", "Order", "Family", "Genus", "Species")) +
+  ggtitle("Effect Size of Microbes")
+
+# annotate_figure(plot, top = text_grob("Effect Size of Microbes", size = 14)) 
+
+ggp_all
+
+ggsave("../figures/by_smoking_status_microbes_effect-size_volcano_plot.png", width = 10, height = 6)
+```
+

@@ -1,0 +1,58 @@
+---
+title: "example script"
+author: "Caroline Wheeler"
+date: '2022-09-20'
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+
+# load libaries
+library(tidyverse)
+```
+
+Read in microbiome data 
+```{r}
+# read in each relative abundance table - one for each taxonomic level
+king <- read.csv("../data/derived/RelAbun/RelAbun_king.csv")
+phyl <- read.csv("../data/derived/RelAbun/RelAbun_phyl.csv")
+class <- read.csv("../bewell/data/derived/RelAbun/RelAbun_class.csv")
+ord <- read.csv("../data/derived/RelAbun/RelAbun_ord.csv")
+fam <- read.csv("../data/derived/RelAbun/RelAbun_fam.csv")
+gen <- read.csv("../data/derived/RelAbun/RelAbun_gen.csv")
+spec <- read.csv("../data/derived/RelAbun/RelAbun_spec.csv")
+```
+Combine into one dataframe
+```{r}
+# create list of dataframe names
+df_list <- list(king, phyl, class, ord, fam, gen, spec)
+
+# merge and rename subject ID variable 
+taxa <- df_list %>% reduce(full_join, by='X') %>%
+  rename("Sample" = X)
+```
+
+Read in long form sample key
+```{r}
+samplabs <- readRDS("../../data/derived/clinical_manuscript.rds")$samples_long 
+```
+
+Merge sample key and microbiome data 
+```{r}
+taxa_samps <- merge(samplabs, taxa)
+```
+
+
+## EXAMPLE: comobine microbiome data with some other variable
+
+read in data
+```{r}
+demographics <- readRDS("../../data/derived/clinical_manuscript.rds")$subjects
+```
+
+merge by 'Subject.ID'
+```{r}
+combined <- merge(demographics, taxa_samps)
+```
+

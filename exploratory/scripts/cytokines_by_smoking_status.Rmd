@@ -1,0 +1,153 @@
+---
+title: "effect size plot-cytokines by smoking status side by side
+author: "Bailey Conrad"
+date: "`r Sys.Date()`"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+
+library(tidyverse)
+library(glmm)
+library(broom)
+library(rlist)
+library(ggrepel)
+library(ggtext)
+library(ggplot2)
+library(ggpubr)
+```
+
+
+```{r}
+cytokines <- read.csv("../../data/derived/cytokines_avg-results.csv")
+samplabs <- readRDS("../../data/derived/clinical_manuscript.rds")$samples
+demos <- readRDS("../../data/derived/clinical_manuscript.rds")$subjects
+```
+
+Converting data into wide format from long format. 
+```{r}
+cytokines %>% select(-X) %>% pivot_wider(names_from = cytokine, values_from = avg.res)
+```
+
+```{r}
+combine <- merge(samplabs,demos,by="Subject.ID")
+```
+
+
+```{r}
+#piping manipulations until you have what you want
+#all we want is sample id and berry group (labels for all 4 groups)
+#we are testing post BRB to preP, postP, and preBRB
+samplab.form <- combine %>%
+  select(Subject.Number, placebo, Smoking.status) %>%
+  mutate(preP = ifelse(placebo == "Week 0", 1, 3), #quote bc exact string #==; is equal to operator #true = 1, false =3
+         postP = ifelse(placebo == "Week 0", 2, 4), 
+         preBRB = ifelse(placebo == "Week 0", 3, 1),
+        postBRB = ifelse(placebo == "Week 0", 4, 2)) %>%
+  pivot_longer(names_to = "timepoint.label", values_to = "timepoints", cols = c("preP", "postP", "preBRB", "postBRB")) %>%
+  mutate(Sample = paste0(Subject.Number, "-", timepoints)) %>%
+  select(Sample, timepoint.label, Smoking.status) 
+
+
+cyto.form.former <- cytokines %>%
+ select(-X) %>% pivot_wider(names_from = cytokine, values_from = avg.res) %>%
+  mutate(Sample = gsub("^0", "", Sample), Sample = gsub("\\.1$", "", Sample)) %>%
+  left_join(samplab.form) %>%
+  mutate(berry.group = ifelse(grepl("postBRB",timepoint.label), 1, 0)) %>%
+  filter(Smoking.status=="former") 
+```
+
+```{r}
+# object <- c("ALCAM.CD166", "C.Reactive.Protein.CRP", "CCL2.JE.MCP.1", "Complement.Component.C9", "Cystatin.C", "IL.1.beta.IL.1F2", "IL.10", "IL.12.IL.23.p40", "IL.6", "MMP.2", "S100A9", "TNF.alpha", "vWF.A2")
+object <- unique(cytokines$cytokine)
+
+#arguments: we want to make = to the variables; must be defined prior to function 
+#variable: object making in R that shows in environment
+#outcome = label to a column
+#binomial and logistic regression
+#cytos: testing against outcome
+#modin: data frame with all the columns
+capture.models.univ.former <- function(outcome, lfun, cytos, modin) {
+  mods.list <- lapply(cytos, function(x)  try({glm(as.formula(paste0(outcome, " ~ ", x)), family = lfun, data = modin) %>% tidy()}))
+  
+mods.list.clean <- list.clean(mods.list, function(x) is.null(x))
+mods.df <- bind_rows(mods.list.clean)
+return(mods.df)
+}
+```
+
+
+```{r warning=FALSE}
+former <- capture.models.univ.former(outcome = "berry.group", lfun = "binomial", cytos = object, modin = cyto.form.former) %>%
+  filter(p.value<1.0) %>%
+  filter(term !="(Intercept)") %>%
+  mutate(pointlabs = ifelse(-log(p.value) > 0.5, term, NA)) %>%
+  
+  
+ggplot(aes(x = estimate, y = -log(p.value), label = pointlabs, color = term)) +
+  geom_point() +
+  theme_bw(base_size = 18) +
+  labs(x = "Estimate", y = "-log(p-value)") +
+  theme(plot.title = element_text(hjust = 0.5)) +
+  geom_hline(yintercept = 0.5) +
+  geom_label_repel() +
+  theme(legend.position="none") +
+  ggtitle("Former Smokers") +
+  scale_color_viridis_d(option = "turbo")
+          
+former
+```
+
+```{r}
+cyto.form.current <- cytokines %>%
+ select(-X) %>% pivot_wider(names_from = cytokine, values_from = avg.res) %>%
+  mutate(Sample = gsub("^0", "", Sample), Sample = gsub("\\.1$", "", Sample)) %>%
+  left_join(samplab.form) %>%
+  mutate(berry.group = ifelse(grepl("postBRB",timepoint.label), 1, 0)) %>%
+  filter(Smoking.status=="current") 
+```
+
+```{r}
+object <- c("ALCAM.CD166", "C.Reactive.Protein.CRP", "CCL2.JE.MCP.1", "Complement.Component.C9", "Cystatin.C", "IL.1.beta.IL.1F2", "IL.10", "IL.12.IL.23.p40", "IL.6", "MMP.2", "S100A9", "TNF.alpha", "vWF.A2")
+#object <- unique(cytokines$cytokine)
+
+capture.models.univ.current <- function(outcome, lfun, cytos, modin) {
+  mods.list <- lapply(cytos, function(x)  try({glm(as.formula(paste0(outcome, " ~ ", x)), family = lfun, data = modin) %>% tidy()}))
+  
+mods.list.clean <- list.clean(mods.list, function(x) is.null(x))
+mods.df <- bind_rows(mods.list.clean)
+return(mods.df)
+}
+```
+
+```{r}
+current <- capture.models.univ.current(outcome = "berry.group", lfun = "binomial", cytos = object, modin = cyto.form.current) %>%
+  filter(p.value<1.0) %>%
+  filter(term !="(Intercept)") %>%
+  mutate(pointlabs = ifelse(-log(p.value) > 0.5, term, NA)) %>%
+#log is log base 2--default in R
+    
+ggplot(aes(x = estimate, y = -log(p.value), label = pointlabs, color = term)) +
+  geom_point() +
+  theme_bw(base_size = 18) +
+  labs(x = "Estimate", y = "-log(p-value)") +
+  theme(plot.title = element_text(hjust = 0.5)) +
+  geom_hline(yintercept = 0.5) +
+  geom_label_repel() +
+  theme(legend.position="none") +
+  ggtitle("Current Smokers") +
+  scale_color_viridis_d(option = "turbo")
+
+current
+```
+
+```{r}
+plot <- ggarrange(current, former)
+
+annotate_figure(plot, top = text_grob("Effect Size of Cytokines", size = 18)) 
+
+ggsave("../figures/by_smoking_status_cytokine_effect-size_volcano_plot.png")
+```
+
+

@@ -1,0 +1,242 @@
+---
+title: "Lachno phylogeny enrichment"
+author: "Rebecca Hoyd"
+date: "2/6/2024"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+
+library(tidyverse)
+library(stringr)
+library(ggnewscale)
+library(taxize)
+library(phytools)
+library(phylobase)
+library(ggrepel)
+```
+
+# Load data
+
+```{r}
+modres <- readRDS("../../../data/derived/glm_binomial_model.RData")
+mics <- read.csv("../../../data/derived/bewell_taxonomy_relAbun.csv", stringsAsFactors = F)
+
+responders <- paste0("HONC60-", c(68,79,84,85))
+```
+
+# Define lachno groups
+
+## All Lachnospira in our microbe results
+
+```{r}
+allspecs <- mics %>%
+  select(Taxonomy, TaxNum) %>%
+  filter(grepl("s__", Taxonomy)) %>%
+  distinct()
+
+allspecs.remtax <- str_remove(allspecs$Taxonomy,".*\\|")
+alltax <- allspecs$TaxNum
+
+lachno.members <- unique(subset(allspecs$Taxonomy, grepl("f__Lachno", allspecs$Taxonomy)))
+
+lachno.remtax <- str_remove(lachno.members,".*\\|")
+lachno.taxids <- unique(subset(allspecs$TaxNum, grepl("f__Lachno", allspecs$Taxonomy)))
+# writeLines(lachno.taxids, "../data/BEWELL/lachnospiraceae-taxids.txt")
+```
+
+## Lachno associated with BRB
+
+```{r}
+brb.enriched <- modres %>%
+  filter(estimate > 0 &
+           p.value < 0.05 &
+         term %in% allspecs.remtax) %>%
+  mutate(lachno = ifelse(term %in% lachno.remtax, "Lachno", "Not Lachno"))
+
+```
+
+```{r}
+brb.enriched.taxids <- mics %>%
+  select(Taxonomy, TaxNum) %>%
+  distinct() %>%
+  mutate(nodeleaf = gsub(".*\\|", "", Taxonomy),
+         taxleaf = gsub(".*\\|", "", TaxNum)) %>%
+  filter(nodeleaf %in% brb.enriched$term)
+```
+
+# Format for phylo plot
+
+## Retrieve new segments and point coords for plot
+
+```{r}
+taxids.leaf <- as.numeric(str_remove(alltax, ".*\\|"))
+taxize_allspec <- classification(taxids.leaf, db = "ncbi")
+ncbitree <- class2tree(taxize_allspec, check = T)
+```
+
+```{r}
+getPhyloSegments <- function(phylotree, taxids){
+  
+  taxidkey <- as.data.frame(cbind(tname = phylotree$tip.label,
+                                  taxid = as.character(taxids)))
+  
+  # Generate xy coords for edges and nodes
+  tmp1 <- as(phylotree, "phylo4")
+  tmp <- phylobase::phyloXXYY(tmp1)
+  
+  # Handle node labelling. To get the labels into the correct order, look at the edges object in the phy object contained in the phylo4 object. Pull the descendents column and it will have the order of the tips. Do not try to use the edge order or tip labels from the top level of the phylo4 object.
+  
+  nodepts.unlab <- as.data.frame(cbind(xx = tmp$xx, yy = tmp$yy)) %>%
+    mutate(xx = as.numeric(xx),
+           yy = as.numeric(yy))
+  nodepts.unlab$tname <- tmp$phy@label[tmp$phy@edge[,2]]
+
+  nodepts <- nodepts.unlab %>%
+    left_join(taxidkey)
+  
+  
+  # Make segments into a long df, instead of separated by horizontal and vertical segments.
+  segs1 <- as.data.frame(tmp$segs)[,1:4]
+  segs2 <- as.data.frame(tmp$segs)[,5:8]
+  colnames(segs2) <- gsub("h", "v", colnames(segs2))
+  segs <- bind_rows(segs1,segs2)
+  
+  
+  phylcoords <- list(segs, nodepts)
+  names(phylcoords) <- c("Segments", "Nodes")
+  return(phylcoords)
+}
+
+phylo.coords <- getPhyloSegments(ncbitree$phylo, taxids.leaf)
+
+# phylo.coords$Nodes$taxid <- as.character(c(lachno.taxids.leaf, rep(NA, nrow(phylo.coords$Nodes) - length(lachno.taxids.leaf))))
+```
+
+## Matching to enrichment data for points
+
+```{r}
+nodes.forjoin <- phylo.coords$Nodes %>%
+  mutate(Lachno = ifelse(taxid %in% brb.enriched.taxids$taxleaf, "Lachno", "Not Lachno")) %>%
+  filter(Lachno == "Lachno")
+
+```
+
+
+## Plot
+
+```{r}
+ggplot(phylo.coords$Segments) +
+  geom_segment(aes(y = v0x, x = v0y, yend = v1x, xend = v1y)) +
+  geom_point(data = nodes.forjoin, aes(x = yy, y = xx, color = Lachno), show.legend = F) +
+  coord_polar() +
+  # scale_color_viridis_c(option = "A", name = "log2FoldChange") +
+  lims(x = c(0,1.025)) +
+  labs(x = "", y = "") +
+  scale_color_manual(values = "darkred") +
+  theme_minimal() +
+  theme(axis.text = element_blank(),
+        axis.ticks = element_blank(),
+        panel.grid = element_blank())
+ggsave("../figures/circle_phylo_all-highlight-lach.png")
+ggsave("../figures/circle_phylo_all-highlight-lach.svg")
+```
+
+# Volcano plot
+
+## Get BRB fold change
+
+
+```{r}
+prepareFoldChangeLev <- function(lev.in, lev.out){
+  
+  if(!is.na(lev.out)){
+  tmp.lev <- mics %>%
+    filter(grepl(lev.in, Taxonomy) & !grepl(lev.out, Taxonomy))
+  }
+  else {
+    tmp.lev <- mics %>%
+      filter(grepl(lev.in, Taxonomy))
+  }
+  
+  fc.prep <- tmp.lev %>%
+  mutate(term = str_remove(Taxonomy, ".*\\|"),
+         brb.code = ifelse(variable == "tB", "treatment", "control")) %>%
+  select(sample, term, RelAbun, brb.code) %>%
+  group_by(sample, term, brb.code) %>%
+  summarise(RelAbun = sum(RelAbun)) %>%
+  ungroup() %>%
+  pivot_wider(names_from = "term", values_from = "RelAbun", values_fill = 0) %>%
+  pivot_longer(-c("sample", "brb.code"), names_to = "term", values_to = "RelAbun") %>%
+  group_by(term, brb.code) %>%
+  summarise(mean.ra = mean(RelAbun)) %>%
+  pivot_wider(names_from = "brb.code", values_from = "mean.ra") %>%
+  mutate(l2fc = log(treatment/control),
+         l2fc = case_when(!l2fc %in% c(Inf, -Inf) ~ l2fc)) %>%
+  select(term, l2fc)
+  
+  return(fc.prep)
+}
+```
+
+```{r}
+set.levin <- c("k__", "p__", "c__", "o__", "f__", "g__", "s__")
+set.levout <- c(set.levin[2:6], NA)
+
+
+points.foldchange <- lapply(1:6, function(x) prepareFoldChangeLev(set.levin[x], set.levout[x])) %>%
+  bind_rows()
+```
+
+## Combine to new plot data
+
+```{r}
+plotdat <- modres %>%
+  left_join(points.foldchange) %>%
+  filter(grepl("s__", term)) %>%
+  mutate(highlight = ifelse(p.value < 0.05, str_replace(str_remove(term, "\\w__"), "_", " "), NA),
+         Lachno = case_when(term %in% lachno.remtax ~ "Lachnospiraceae",
+                            !(term %in% lachno.remtax) ~"Other")
+         )
+
+plotdat %>%
+  ggplot(aes(x = l2fc, y = -log(p.value), color = Lachno, label = highlight)) +
+  geom_point(show.legend = F) +
+  geom_hline(yintercept = -log(.05)) +
+  geom_label_repel(show.legend = F) +
+  scale_color_manual(values = c("darkred", "orange"), name = "") +
+  labs(x = "Log2FoldChange") +
+  theme_bw(base_size = 14)
+ggsave("../figures/volcano_brb-enrich_l2fc.png", height = 2.5, width = 4)
+
+plotdat %>%
+  ggplot(aes(x = l2fc, y = -log(p.value), color = Lachno, label = highlight)) +
+  geom_point() +
+  geom_hline(yintercept = -log(.05)) +
+  geom_label_repel(show.legend = F) +
+  scale_color_manual(values = c("darkred", "orange"), name = "") +
+  labs(x = "Log2FoldChange") +
+  theme_bw(base_size = 14)
+ggsave("../figures/volcano_brb-enrich_l2fc_legend.png", height = 2.5, width = 4)
+```
+
+# Bootstrap p value
+
+```{r}
+
+sample.vec <- ifelse(allspecs.remtax %in% lachno.remtax, "Lachno", "Not Lachno")
+
+set.seed(112358)
+sample.seeds <- runif(10000, 1e4, 1e5)
+
+lachno.draws <-vector()
+for(i in sample.seeds){
+  set.seed((i))
+  pullspecs <- sample(sample.vec, 2, replace = F)
+  res <- all(pullspecs == "Lachno")
+  lachno.draws <- append(lachno.draws, res)
+}
+
+sum(lachno.draws)/length(lachno.draws)
+```

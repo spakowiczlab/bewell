@@ -1,0 +1,868 @@
+---
+title: "Urine metabolomics EDA"
+author: "Lane Nevers"
+date: "2023-06-12"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+
+library(readxl)
+library(tidyverse)
+library(dplyr)
+library(ggplot2)
+library(tidyr)
+```
+
+read in files 
+```{r}
+met <- readxl::read_xlsx("../data/raw/urine-metabolomics/Dan Urine Anthocyanin 11-10-2022.xlsx")
+met2 <- readxl::read_xlsx("../data/raw/urine-metabolomics/Dan Urine Anthocyanin 11-10-2022.xlsx")
+
+metadata4 <- read_excel("../data/raw/urine-metabolomics/Dan Urine Anthocyanin 11-10-2022.xlsx", sheet = "concentration ng mL")
+metadata5 <- read_excel("../data/raw/urine-metabolomics/Dan Urine Anthocyanin 11-10-2022.xlsx", sheet = "concentration ng mL")
+metadata6 <- read_excel("../data/raw/urine-metabolomics/Dan Urine Anthocyanin 11-10-2022.xlsx", sheet = "concentration ng mL")
+metadata7 <- read_excel("../data/raw/urine-metabolomics/Dan Urine Anthocyanin 11-10-2022.xlsx", sheet = "concentration ng mL")
+metadata8 <- read_excel("../data/raw/urine-metabolomics/Dan Urine Anthocyanin 11-10-2022.xlsx", sheet = "concentration ng mL")
+metadata9 <- read_excel("../data/raw/urine-metabolomics/Dan Urine Anthocyanin 11-10-2022.xlsx", sheet = "concentration ng mL")
+metadata10 <- read_excel("../data/raw/urine-metabolomics/Dan Urine Anthocyanin 11-10-2022.xlsx", sheet = "concentration ng mL")
+metadata11 <- read_excel("../data/raw/urine-metabolomics/Dan Urine Anthocyanin 11-10-2022.xlsx", sheet = "concentration ng mL")
+metadata12 <- read_excel("../data/raw/urine-metabolomics/Dan Urine Anthocyanin 11-10-2022.xlsx", sheet = "concentration ng mL")
+metadata13 <- read_excel("../data/raw/urine-metabolomics/Dan Urine Anthocyanin 11-10-2022.xlsx", sheet = "concentration ng mL")
+metadata14 <- read_excel("../data/raw/urine-metabolomics/Dan Urine Anthocyanin 11-10-2022.xlsx", sheet = "concentration ng mL")
+metadata15 <- read_excel("../data/raw/urine-metabolomics/Dan Urine Anthocyanin 11-10-2022.xlsx", sheet = "concentration ng mL")
+metadata16 <- read_excel("../data/raw/urine-metabolomics/Dan Urine Anthocyanin 11-10-2022.xlsx", sheet = "concentration ng mL")
+metadata17 <- read_excel("../data/raw/urine-metabolomics/Dan Urine Anthocyanin 11-10-2022.xlsx", sheet = "concentration ng mL")
+metadata18 <- read_excel("../data/raw/urine-metabolomics/Dan Urine Anthocyanin 11-10-2022.xlsx", sheet = "concentration ng mL")
+metadata19 <- read_excel("../data/raw/urine-metabolomics/Dan Urine Anthocyanin 11-10-2022.xlsx", sheet = "concentration ng mL")
+timepoint.key <- readRDS("../../data/derived/clinical_manuscript.rds")$samples_long
+```
+
+testing how to best manipulate data
+```{r}
+met2 <- met2[-c(2:23), ]
+met2.transf <- met2 %>%
+  gather(key = "column_ID", value = "value", 2:81)
+met2.sep <- met2.transf %>%
+  separate(column_ID, into = c("numeric", "text"), sep = "-" , remove = FALSE)
+```
+
+
+1.1 transform data for cy glc sulf
+```{r}
+metadata4 <- metadata4[-c(2:37), ]
+metadata4.trans <- metadata4 %>% 
+  gather(key = "column_ID", value = "value", 2:81)
+metadata4.sep <- metadata4.trans %>%
+  separate(column_ID, into = c("numeric", "text"), sep = "-" , remove = FALSE)
+metadata4.sep <- metadata4.sep %>%
+  rename(ng.mL=value)
+metadata4.sep$text <- toupper(metadata4.sep$text)
+timepoint.key[6, "timepoints"] <- "HONC60-03-v3"
+timepoint.key[9, "timepoints"] <- "HONC60-05-v3"
+timepoint.key[87, "timepoints"] <- "HONC60-76-v1"
+timepoint.key[120, "timepoints"] <- "HONC60-97-v4"
+timepoint.key <- timepoint.key %>%
+   separate(timepoints, into = c("Prefix", "Suffix"), sep = "(?<=HONC60)-")
+timepoint.key <- timepoint.key %>%
+  separate(Suffix, into = c("numeric", "text"), sep = "-")
+timepoint.key$text <- toupper(timepoint.key$text)
+timepoint.key$text <- gsub("\\.1", "", timepoint.key$text)
+merged.meta.tpk <- merge(metadata4.sep, timepoint.key, by = c("numeric", "text"))
+merged.meta.tpk <- merged.meta.tpk %>%
+  mutate(timepoint_meaning = case_when(
+    Timepoint == "rP" ~ "Pre-placebo" ,
+    Timepoint == "tP" ~ "Post-placebo" , 
+    Timepoint == "rB" ~ "Pre-BRB" , 
+    Timepoint == "tB" ~ "Post-BRB" , 
+    TRUE ~ "unknown"
+  ))
+
+```
+
+1.2 plot for cy glc sulf
+```{r}
+metadata4.sep$ng.mL <- as.numeric(metadata4.sep$ng.mL)
+ggplot(metadata4.sep, aes(x = text, y = ng.mL, color = factor(numeric))) + 
+  geom_point() + 
+  scale_y_continuous(name = "ng.mL", limits = c(0,340))
+```
+1.3 boxplot for cy glc sulf
+```{r}
+merged.meta.tpk$ng.mL <- as.numeric(merged.meta.tpk$ng.mL)
+
+non_numeric_values <- merged.meta.tpk[!is.na(as.numeric(merged.meta.tpk$ng.mL)) & !is.finite(merged.meta.tpk$ng.mL), "ng.mL"]
+if (length(non_numeric_values) > 0) {
+  print("Warning: 'ng.mL' column contains non-numeric values.")
+}
+avg_data <- merged.meta.tpk %>%
+  group_by(timepoint_meaning) %>%
+  summarize(avg_value = mean(ng.mL, na.rm = TRUE))
+View(avg_data)
+ggplot(merged.meta.tpk, aes(x = factor(timepoint_meaning, levels = c("Pre-placebo", "Post-placebo", "Pre-BRB", "Post-BRB")) , y = ng.mL)) +
+  geom_boxplot() +
+  labs(x = "Timepoint Meaning")
+```
+
+
+1.4 plot for cy glc sulf highlighted (example)
+```{r}
+metadata4.sep.high <- metadata4.sep
+metadata4.sep.high <- subset(metadata4.sep.high, numeric %in% c(21, 61, 60, 71, 77, 81, 95, 96, 62, 85))
+metadata4.sep.high$ng.mL <- as.numeric(metadata4.sep.high$ng.mL)
+ggplot(metadata4.sep.high, aes(x = text, y = ng.mL, color = factor(numeric))) + 
+  geom_point() + 
+  scale_y_continuous(name = "ng.mL", limits = c(0,310))
+```
+
+2.1 transform data for cy gluA
+```{r}
+metadata5 <- metadata5[-c(1, 3:37), ]
+metadata5.trans <- metadata5 %>%
+  gather(key = "column_ID", value = "value", 2:81)
+metadata5.sepe <- metadata5.trans %>%
+  separate(column_ID, into = c("numeric", "text"), sep = "-", remove = FALSE)
+metadata5.sepe <- metadata5.sepe %>%
+  rename(ng.mL=value)
+metadata5.sepe$text <- toupper(metadata5.sepe$text)
+merged.meta5.tpk <- merge(metadata5.sepe, timepoint.key, by = c("numeric", "text"))
+merged.meta5.tpk <- merged.meta5.tpk %>%
+  mutate(timepoint_meaning = case_when(
+    Timepoint == "rP" ~ "Pre-placebo" ,
+    Timepoint == "tP" ~ "Post-placebo" , 
+    Timepoint == "rB" ~ "Pre-BRB" , 
+    Timepoint == "tB" ~ "Post-BRB" , 
+    TRUE ~ "unknown"
+  ))
+```
+
+2.2 extract all rows that exclude 'NA' from cy gluA
+```{r}
+metadata5.sepe.dupe <- metadata5.sepe[complete.cases(metadata5.sepe),]
+values_to_delete <- c(95, 96, 68, 61)
+metadata5.sepe.dupe <- metadata5.sepe.dupe[!(metadata5.sepe.dupe$numeric %in% values_to_delete), ]
+```
+
+2.3 plot for cy gluA
+```{r}
+metadata5.sepe.dupe$ng.mL <- as.numeric(metadata5.sepe.dupe$ng.mL)
+ggplot(metadata5.sepe.dupe, aes(x = text, y = ng.mL, color = factor(numeric))) + 
+  geom_point() + 
+  scale_y_continuous(name = "ng.mL")
+```
+2.4 graph for cy glcA
+```{r}
+merged.meta5.tpk$ng.mL <- as.numeric(merged.meta5.tpk$ng.mL)
+
+non_numeric_values <- merged.meta5.tpk[!is.na(as.numeric(merged.meta.tpk$ng.mL)) & !is.finite(merged.meta5.tpk$ng.mL), "ng.mL"]
+if (length(non_numeric_values) > 0) {
+  print("Warning: 'ng.mL' column contains non-numeric values.")
+}
+avg_data <- merged.meta5.tpk %>%
+  group_by(timepoint_meaning) %>%
+  summarize(avg_value = mean(ng.mL, na.rm = TRUE))
+View(avg_data)
+ggplot(merged.meta5.tpk, aes(x = factor(timepoint_meaning, levels = c("Pre-placebo", "Post-placebo", "Pre-BRB", "Post-BRB")) , y = ng.mL)) +
+  geom_boxplot() +
+  labs(x = "Timepoint Meaning")
+```
+3.1 transform data for cy hex 
+```{r}
+metadata6 <- metadata6[-c(1,2,4:37), ]
+metadata6.trans <- metadata6 %>%
+  gather(key = "column_ID", value = "value", 2:81)
+metadata6.sep <- metadata6.trans %>%
+  separate(column_ID, into = c("numeric", "text"), sep = "-", remove = FALSE)
+metadata6.sep <- metadata6.sep %>%
+  rename(ng.mL=value)
+metadata6.sep$text <- toupper(metadata6.sep$text)
+merged.meta6.tpk <- merge(metadata6.sep, timepoint.key, by = c("numeric", "text"))
+merged.meta6.tpk <- merged.meta6.tpk %>%
+  mutate(timepoint_meaning = case_when(
+    Timepoint == "rP" ~ "Pre-placebo" ,
+    Timepoint == "tP" ~ "Post-placebo" , 
+    Timepoint == "rB" ~ "Pre-BRB" , 
+    Timepoint == "tB" ~ "Post-BRB" , 
+    TRUE ~ "unknown"
+  ))
+```
+
+```{r}
+merged.meta6.tpk$ng.mL <- as.numeric(merged.meta6.tpk$ng.mL)
+
+non_numeric_values <- merged.meta6.tpk[!is.na(as.numeric(merged.meta6.tpk$ng.mL)) & !is.finite(merged.meta6.tpk$ng.mL), "ng.mL"]
+if (length(non_numeric_values) > 0) {
+  print("Warning: 'ng.mL' column contains non-numeric values.")
+}
+avg_data <- merged.meta6.tpk %>%
+  group_by(timepoint_meaning) %>%
+  summarize(avg_value = mean(ng.mL, na.rm = TRUE))
+
+ggplot(merged.meta6.tpk, aes(x = factor(timepoint_meaning, levels = c("Pre-placebo", "Post-placebo", "Pre-BRB", "Post-BRB")) , y = ng.mL)) +
+  geom_boxplot() +
+  labs(x = "Timepoint Meaning")
+```
+
+3.2 extract all rows that exclude 'NA' from cy hex
+```{r}
+metadata6.sep.dup <- metadata6.sep.dup[metadata6.sep.dup$ng.mL != "NA", ]
+```
+
+4.1 transform data for cy rut
+```{r}
+metadata7 <- metadata7[-c(1:3,5:37), ]
+metadata7.trans <- metadata7 %>%
+  gather(key = "column_ID", value = "value", 2:81)
+metadata7.sep <- metadata7.trans %>%
+  separate(column_ID, into = c("numeric", "text"), sep = "-", remove = FALSE)
+metadata7.sep <- metadata7.sep %>%
+  rename(ng.mL=value)
+metadata7.sep$text <- toupper(metadata7.sep$text)
+merged.meta7.tpk <- merge(metadata7.sep, timepoint.key, by = c("numeric", "text"))
+merged.meta7.tpk <- merged.meta7.tpk %>%
+  mutate(timepoint_meaning = case_when(
+    Timepoint == "rP" ~ "Pre-placebo" ,
+    Timepoint == "tP" ~ "Post-placebo" , 
+    Timepoint == "rB" ~ "Pre-BRB" , 
+    Timepoint == "tB" ~ "Post-BRB" , 
+    TRUE ~ "unknown"
+  ))
+```
+
+4.2 extract all rows that exclude 'NA' from cy rut
+```{r}
+metadata7.sep.dup <- metadata7.sep[metadata7.sep$ng.mL != "NA", ]
+```
+4.3 plot for cy rut
+```{r}
+merged.meta7.tpk$ng.mL <- as.numeric(merged.meta7.tpk$ng.mL)
+
+non_numeric_values <- merged.meta7.tpk[!is.na(as.numeric(merged.meta7.tpk$ng.mL)) & !is.finite(merged.meta7.tpk$ng.mL), "ng.mL"]
+if (length(non_numeric_values) > 0) {
+  print("Warning: 'ng.mL' column contains non-numeric values.")
+}
+avg_data <- merged.meta7.tpk %>%
+  group_by(timepoint_meaning) %>%
+  summarize(avg_value = mean(ng.mL, na.rm = TRUE))
+View(avg_data)
+ggplot(merged.meta7.tpk, aes(x = factor(timepoint_meaning, levels = c("Pre-placebo", "Post-placebo", "Pre-BRB", "Post-BRB")) , y = ng.mL)) +
+  geom_boxplot() +
+  labs(x = "Timepoint Meaning")
+```
+5.1 transform data for cy sam
+```{r}
+metadata8 <- metadata8[-c(1:4,6:37), ]
+metadata8.trans <- metadata8 %>%
+  gather(key = "column_ID", value = "value", 2:81)
+metadata8.sep <- metadata8.trans %>%
+  separate(column_ID, into = c("numeric", "text"), sep = "-", remove = FALSE)
+metadata8.sep <- metadata8.sep %>%
+  rename(ng.mL=value)
+metadata8.sep$text <- toupper(metadata8.sep$text)
+merged.meta8.tpk <- merge(metadata8.sep, timepoint.key, by = c("numeric", "text"))
+merged.meta8.tpk <- merged.meta8.tpk %>%
+  mutate(timepoint_meaning = case_when(
+    Timepoint == "rP" ~ "Pre-placebo" ,
+    Timepoint == "tP" ~ "Post-placebo" , 
+    Timepoint == "rB" ~ "Pre-BRB" , 
+    Timepoint == "tB" ~ "Post-BRB" , 
+    TRUE ~ "unknown"
+  ))
+```
+
+5.2 extract all rows that exclude 'NA' from cy sam
+```{r}
+metadata8.sep.dup <- metadata8.sep[metadata8.sep$ng.mL != "NA", ]
+```
+5.3 graph for cy sam
+```{r}
+merged.meta8.tpk$ng.mL <- as.numeric(merged.meta8.tpk$ng.mL)
+
+non_numeric_values <- merged.meta8.tpk[!is.na(as.numeric(merged.meta8.tpk$ng.mL)) & !is.finite(merged.meta8.tpk$ng.mL), "ng.mL"]
+if (length(non_numeric_values) > 0) {
+  print("Warning: 'ng.mL' column contains non-numeric values.")
+}
+avg_data <- merged.meta8.tpk %>%
+  group_by(timepoint_meaning) %>%
+  summarize(avg_value = mean(ng.mL, na.rm = TRUE))
+View(avg_data)
+ggplot(merged.meta8.tpk, aes(x = factor(timepoint_meaning, levels = c("Pre-placebo", "Post-placebo", "Pre-BRB", "Post-BRB")) , y = ng.mL)) +
+  geom_boxplot() +
+  labs(x = "Timepoint Meaning")
+```
+
+6.1 transform data for cy sulf
+```{r}
+metadata9 <- metadata9[-c(1:5,7:37), ]
+metadata9.trans <- metadata9 %>%
+  gather(key = "column_ID", value = "value", 2:81)
+metadata9.sep <- metadata9.trans %>%
+  separate(column_ID, into = c("numeric", "text"), sep = "-", remove = FALSE)
+metadata9.sep <- metadata9.sep %>%
+  rename(ng.mL=value)
+metadata9.sep$text <- toupper(metadata9.sep$text)
+merged.meta9.tpk <- merge(metadata9.sep, timepoint.key, by = c("numeric", "text"))
+merged.meta9.tpk <- merged.meta9.tpk %>%
+  mutate(timepoint_meaning = case_when(
+    Timepoint == "rP" ~ "Pre-placebo" ,
+    Timepoint == "tP" ~ "Post-placebo" , 
+    Timepoint == "rB" ~ "Pre-BRB" , 
+    Timepoint == "tB" ~ "Post-BRB" , 
+    TRUE ~ "unknown"
+  ))
+```
+
+6.2 extract all rows that exclude 'NA' from cy sulf 
+```{r}
+metadata9.sep.dup <- metadata9.sep[metadata9.sep$ng.mL != "NA", ]
+```
+6.3 plot for cy sulf
+```{r}
+merged.meta9.tpk$ng.mL <- as.numeric(merged.meta9.tpk$ng.mL)
+
+non_numeric_values <- merged.meta9.tpk[!is.na(as.numeric(merged.meta9.tpk$ng.mL)) & !is.finite(merged.meta9.tpk$ng.mL), "ng.mL"]
+if (length(non_numeric_values) > 0) {
+  print("Warning: 'ng.mL' column contains non-numeric values.")
+}
+avg_data <- merged.meta9.tpk %>%
+  group_by(timepoint_meaning) %>%
+  summarize(avg_value = mean(ng.mL, na.rm = TRUE))
+View(avg_data)
+ggplot(merged.meta9.tpk, aes(x = factor(timepoint_meaning, levels = c("Pre-placebo", "Post-placebo", "Pre-BRB", "Post-BRB")) , y = ng.mL)) +
+  geom_boxplot() +
+  labs(x = "Timepoint Meaning")
+```
+
+7.1 transform data for cy xyrut
+```{r}
+metadata10 <- metadata10[-c(1:6,8:37), ]
+metadata10.trans <- metadata10 %>%
+  gather(key = "column_ID", value = "value", 2:81)
+metadata10.sep <- metadata10.trans %>%
+  separate(column_ID, into = c("numeric", "text"), sep = "-", remove = FALSE)
+metadata10.sep <- metadata10.sep %>%
+  rename(ng.mL=value)
+metadata10.sep$text <- toupper(metadata10.sep$text)
+merged.meta10.tpk <- merge(metadata10.sep, timepoint.key, by = c("numeric", "text"))
+merged.meta10.tpk <- merged.meta10.tpk %>%
+  mutate(timepoint_meaning = case_when(
+    Timepoint == "rP" ~ "Pre-placebo" ,
+    Timepoint == "tP" ~ "Post-placebo" , 
+    Timepoint == "rB" ~ "Pre-BRB" , 
+    Timepoint == "tB" ~ "Post-BRB" , 
+    TRUE ~ "unknown"
+  ))
+```
+
+7.2 extract all rows that exclude 'NA' from cy xyrut
+```{r}
+metadata10.sep.dup <- metadata10.sep[metadata10.sep$ng.mL != "NA", ]
+```
+
+7.3 extract all rows that include pnt 77 from cy xyrut
+```{r}
+metadata10.sep.dup.77 <- metadata10.sep.dup[metadata10.sep.dup$numeric == 77, ]
+```
+
+7.4 plot for cy xyrut
+```{r}
+metadata10.sep.dup.77$ng.mL <- as.numeric(metadata10.sep.dup.77$ng.mL)
+ggplot(metadata10.sep.dup.77, aes(x = text, y = ng.mL, color = factor(numeric))) + 
+  geom_point() + 
+  scale_y_continuous(name = "ng.mL")
+```
+7.5 graph for cy xyrut
+```{r}
+merged.meta10.tpk$ng.mL <- as.numeric(merged.meta10.tpk$ng.mL)
+
+non_numeric_values <- merged.meta10.tpk[!is.na(as.numeric(merged.meta10.tpk$ng.mL)) & !is.finite(merged.meta10.tpk$ng.mL), "ng.mL"]
+if (length(non_numeric_values) > 0) {
+  print("Warning: 'ng.mL' column contains non-numeric values.")
+}
+avg_data <- merged.meta10.tpk %>%
+  group_by(timepoint_meaning) %>%
+  summarize(avg_value = mean(ng.mL, na.rm = TRUE))
+View(avg_data)
+ggplot(merged.meta10.tpk, aes(x = factor(timepoint_meaning, levels = c("Pre-placebo", "Post-placebo", "Pre-BRB", "Post-BRB")) , y = ng.mL)) +
+  geom_boxplot() +
+  labs(x = "Timepoint Meaning")
+```
+
+8.1 transform data for ferulic acid
+```{r}
+metadata11 <- metadata11[-c(1:7,9:37), ]
+metadata11.trans <- metadata11 %>%
+  gather(key = "column_ID", value = "value", 2:81)
+metadata11.sep <- metadata11.trans %>%
+  separate(column_ID, into = c("numeric", "text"), sep = "-", remove = FALSE)
+metadata11.sep <- metadata11.sep %>%
+  rename(ng.mL=value)
+metadata11.sep$text <- toupper(metadata11.sep$text)
+merged.meta11.tpk <- merge(metadata11.sep, timepoint.key, by = c("numeric", "text"))
+merged.meta11.tpk <- merged.meta11.tpk %>%
+  mutate(timepoint_meaning = case_when(
+    Timepoint == "rP" ~ "Pre-placebo" ,
+    Timepoint == "tP" ~ "Post-placebo" , 
+    Timepoint == "rB" ~ "Pre-BRB" , 
+    Timepoint == "tB" ~ "Post-BRB" , 
+    TRUE ~ "unknown"
+  ))
+```
+
+8.2 extract all rows that exclude 'NA' from ferulic acid
+```{r}
+metadata11.sep.dup <- metadata11.sep[metadata11.sep$ng.mL != "NA", ]
+```
+
+8.3 plot for ferulic acid
+```{r}
+metadata11.sep.dup$ng.mL <- as.numeric(metadata11.sep.dup$ng.mL)
+ggplot(metadata11.sep.dup, aes(x = text, y = ng.mL, color = factor(numeric))) + 
+  geom_point() + 
+  scale_y_continuous(name = "ng.mL")
+```
+8.4 graph for ferulic acid
+```{r}
+merged.meta11.tpk$ng.mL <- as.numeric(merged.meta11.tpk$ng.mL)
+
+non_numeric_values <- merged.meta11.tpk[!is.na(as.numeric(merged.meta11.tpk$ng.mL)) & !is.finite(merged.meta11.tpk$ng.mL), "ng.mL"]
+if (length(non_numeric_values) > 0) {
+  print("Warning: 'ng.mL' column contains non-numeric values.")
+}
+avg_data <- merged.meta11.tpk %>%
+  group_by(timepoint_meaning) %>%
+  summarize(avg_value = mean(ng.mL, na.rm = TRUE))
+View(avg_data)
+ggplot(merged.meta11.tpk, aes(x = factor(timepoint_meaning, levels = c("Pre-placebo", "Post-placebo", "Pre-BRB", "Post-BRB")) , y = ng.mL)) +
+  geom_boxplot() +
+  labs(x = "Timepoint Meaning")
+```
+
+9.1 transform data for pca
+```{r}
+metadata12 <- metadata12[-c(1:8,10:37), ]
+metadata12.trans <- metadata12 %>%
+  gather(key = "column_ID", value = "value", 2:81)
+metadata12.sep <- metadata12.trans %>%
+  separate(column_ID, into = c("numeric", "text"), sep = "-", remove = FALSE)
+metadata12.sep <- metadata12.sep %>%
+  rename(ng.mL=value)
+metadata12.sep$text <- toupper(metadata12.sep$text)
+merged.meta12.tpk <- merge(metadata12.sep, timepoint.key, by = c("numeric", "text"))
+merged.meta12.tpk <- merged.meta12.tpk %>%
+  mutate(timepoint_meaning = case_when(
+    Timepoint == "rP" ~ "Pre-placebo" ,
+    Timepoint == "tP" ~ "Post-placebo" , 
+    Timepoint == "rB" ~ "Pre-BRB" , 
+    Timepoint == "tB" ~ "Post-BRB" , 
+    TRUE ~ "unknown"
+  ))
+```
+
+9.2 extract all rows that exclude 'NA' from pca
+```{r}
+metadata12.sep.dup <- metadata12.sep[metadata12.sep$ng.mL != "NA", ]
+```
+
+9.3 plot for pca
+```{r}
+metadata12.sep.dup$ng.mL <- as.numeric(metadata12.sep.dup$ng.mL)
+ggplot(metadata12.sep.dup, aes(x = text, y = ng.mL, color = factor(numeric))) + 
+  geom_point() + 
+  scale_y_continuous(name = "ng.mL")
+```
+9.4 graph for pca
+```{r}
+merged.meta12.tpk$ng.mL <- as.numeric(merged.meta12.tpk$ng.mL)
+
+non_numeric_values <- merged.meta12.tpk[!is.na(as.numeric(merged.meta12.tpk$ng.mL)) & !is.finite(merged.meta12.tpk$ng.mL), "ng.mL"]
+if (length(non_numeric_values) > 0) {
+  print("Warning: 'ng.mL' column contains non-numeric values.")
+}
+avg_data <- merged.meta12.tpk %>%
+  group_by(timepoint_meaning) %>%
+  summarize(avg_value = mean(ng.mL, na.rm = TRUE))
+View(avg_data)
+ggplot(merged.meta12.tpk, aes(x = factor(timepoint_meaning, levels = c("Pre-placebo", "Post-placebo", "Pre-BRB", "Post-BRB")) , y = ng.mL)) +
+  geom_boxplot() +
+  labs(x = "Timepoint Meaning")
+```
+
+10.1 transform data for peon gluA
+```{r}
+metadata13 <- metadata13[-c(1:9,11:37), ]
+metadata13.trans <- metadata13 %>%
+  gather(key = "column_ID", value = "value", 2:81)
+metadata13.sep <- metadata13.trans %>%
+  separate(column_ID, into = c("numeric", "text"), sep = "-", remove = FALSE)
+metadata13.sep <- metadata13.sep %>%
+  rename(ng.mL=value)
+metadata13.sep$text <- toupper(metadata13.sep$text)
+merged.meta13.tpk <- merge(metadata13.sep, timepoint.key, by = c("numeric", "text"))
+merged.meta13.tpk <- merged.meta13.tpk %>%
+  mutate(timepoint_meaning = case_when(
+    Timepoint == "rP" ~ "Pre-placebo" ,
+    Timepoint == "tP" ~ "Post-placebo" , 
+    Timepoint == "rB" ~ "Pre-BRB" , 
+    Timepoint == "tB" ~ "Post-BRB" , 
+    TRUE ~ "unknown"
+  ))
+```
+
+10.2 extract all rows that exclude 'NA' from peon gluA
+```{r}
+metadata13.sep.dup <- metadata13.sep[metadata13.sep$ng.mL != "NA", ]
+```
+
+10.3 extract all rows that include pnt 84 from peon gluA
+```{r}
+metadata13.sep.dup.84 <- metadata13.sep.dup[metadata13.sep.dup$numeric == 84, ]
+```
+
+10.4 plot for peon gluA
+```{r}
+metadata13.sep.dup.84$ng.mL <- as.numeric(metadata13.sep.dup.84$ng.mL)
+ggplot(metadata13.sep.dup.84, aes(x = text, y = ng.mL, color = factor(numeric))) + 
+  geom_point() + 
+  scale_y_continuous(name = "ng.mL")
+```
+10.5 graph for peon gluA
+```{r}
+merged.meta13.tpk$ng.mL <- as.numeric(merged.meta13.tpk$ng.mL)
+
+non_numeric_values <- merged.meta13.tpk[!is.na(as.numeric(merged.meta13.tpk$ng.mL)) & !is.finite(merged.meta13.tpk$ng.mL), "ng.mL"]
+if (length(non_numeric_values) > 0) {
+  print("Warning: 'ng.mL' column contains non-numeric values.")
+}
+avg_data <- merged.meta13.tpk %>%
+  group_by(timepoint_meaning) %>%
+  summarize(avg_value = mean(ng.mL, na.rm = TRUE))
+View(avg_data)
+ggplot(merged.meta13.tpk, aes(x = factor(timepoint_meaning, levels = c("Pre-placebo", "Post-placebo", "Pre-BRB", "Post-BRB")) , y = ng.mL)) +
+  geom_boxplot() +
+  labs(x = "Timepoint Meaning")
+```
+
+11.1 transform data for peon hex
+```{r}
+metadata14 <- metadata14[-c(1:10,12:37), ]
+metadata14.trans <- metadata14 %>%
+  gather(key = "column_ID", value = "value", 2:81)
+metadata14.sep <- metadata14.trans %>%
+  separate(column_ID, into = c("numeric", "text"), sep = "-", remove = FALSE)
+metadata14.sep <- metadata14.sep %>%
+  rename(ng.mL=value)
+metadata14.sep$text <- toupper(metadata14.sep$text)
+merged.meta14.tpk <- merge(metadata14.sep, timepoint.key, by = c("numeric", "text"))
+merged.meta14.tpk <- merged.meta14.tpk %>%
+  mutate(timepoint_meaning = case_when(
+    Timepoint == "rP" ~ "Pre-placebo" ,
+    Timepoint == "tP" ~ "Post-placebo" , 
+    Timepoint == "rB" ~ "Pre-BRB" , 
+    Timepoint == "tB" ~ "Post-BRB" , 
+    TRUE ~ "unknown"
+  ))
+```
+
+11.2 extract all rows that exclude 'NA' from peon hex
+```{r}
+metadata14.sep.dup <- metadata14.sep[metadata14.sep$ng.mL != "NA", ]
+```
+11.3 graph for peon hex
+```{r}
+merged.meta14.tpk$ng.mL <- as.numeric(merged.meta14.tpk$ng.mL)
+
+non_numeric_values <- merged.meta14.tpk[!is.na(as.numeric(merged.meta14.tpk$ng.mL)) & !is.finite(merged.meta14.tpk$ng.mL), "ng.mL"]
+if (length(non_numeric_values) > 0) {
+  print("Warning: 'ng.mL' column contains non-numeric values.")
+}
+avg_data <- merged.meta14.tpk %>%
+  group_by(timepoint_meaning) %>%
+  summarize(avg_value = mean(ng.mL, na.rm = TRUE))
+View(avg_data)
+ggplot(merged.meta14.tpk, aes(x = factor(timepoint_meaning, levels = c("Pre-placebo", "Post-placebo", "Pre-BRB", "Post-BRB")) , y = ng.mL)) +
+  geom_boxplot() +
+  labs(x = "Timepoint Meaning")
+```
+
+12.1 transform data for peon rut
+```{r}
+metadata15 <- metadata15[-c(1:11,13:37), ]
+metadata15.trans <- metadata15 %>%
+  gather(key = "column_ID", value = "value", 2:81)
+metadata15.sep <- metadata15.trans %>%
+  separate(column_ID, into = c("numeric", "text"), sep = "-", remove = FALSE)
+metadata15.sep <- metadata15.sep %>%
+  rename(ng.mL=value)
+metadata15.sep$text <- toupper(metadata15.sep$text)
+merged.meta15.tpk <- merge(metadata15.sep, timepoint.key, by = c("numeric", "text"))
+merged.meta15.tpk <- merged.meta15.tpk %>%
+  mutate(timepoint_meaning = case_when(
+    Timepoint == "rP" ~ "Pre-placebo" ,
+    Timepoint == "tP" ~ "Post-placebo" , 
+    Timepoint == "rB" ~ "Pre-BRB" , 
+    Timepoint == "tB" ~ "Post-BRB" , 
+    TRUE ~ "unknown"
+  ))
+```
+
+12.2 extract all rows that exclude 'NA' from peon rut
+```{r}
+metadata15.sep.dup <- metadata15.sep[metadata15.sep$ng.mL != "NA", ]
+```
+
+12.3 extract all rows that include pnt 66 from peon rut
+```{r}
+metadata15.sep.dup.66 <- metadata15.sep.dup[metadata15.sep.dup$numeric == 66, ]
+```
+
+12.4 plot for peon rut
+```{r}
+metadata15.sep.dup.66$ng.mL <- as.numeric(metadata15.sep.dup.66$ng.mL)
+ggplot(metadata15.sep.dup.66, aes(x = text, y = ng.mL, color = factor(numeric))) + 
+  geom_point() + 
+  scale_y_continuous(name = "ng.mL")
+```
+12.5 graph for peon rut
+```{r}
+merged.meta15.tpk$ng.mL <- as.numeric(merged.meta15.tpk$ng.mL)
+
+non_numeric_values <- merged.meta15.tpk[!is.na(as.numeric(merged.meta15.tpk$ng.mL)) & !is.finite(merged.meta15.tpk$ng.mL), "ng.mL"]
+if (length(non_numeric_values) > 0) {
+  print("Warning: 'ng.mL' column contains non-numeric values.")
+}
+avg_data <- merged.meta15.tpk %>%
+  group_by(timepoint_meaning) %>%
+  summarize(avg_value = mean(ng.mL, na.rm = TRUE))
+View(avg_data)
+ggplot(merged.meta15.tpk, aes(x = factor(timepoint_meaning, levels = c("Pre-placebo", "Post-placebo", "Pre-BRB", "Post-BRB")) , y = ng.mL)) +
+  geom_boxplot() +
+  labs(x = "Timepoint Meaning")
+```
+
+
+13.1 transform data for peon sam
+```{r}
+metadata16 <- metadata16[-c(1:12,14:37), ]
+metadata16.trans <- metadata16 %>%
+  gather(key = "column_ID", value = "value", 2:81)
+metadata16.sep <- metadata16.trans %>%
+  separate(column_ID, into = c("numeric", "text"), sep = "-", remove = FALSE)
+metadata16.sep <- metadata16.sep %>%
+  rename(ng.mL=value)
+metadata16.sep$text <- toupper(metadata16.sep$text)
+merged.meta16.tpk <- merge(metadata16.sep, timepoint.key, by = c("numeric", "text"))
+merged.meta16.tpk <- merged.meta16.tpk %>%
+  mutate(timepoint_meaning = case_when(
+    Timepoint == "rP" ~ "Pre-placebo" ,
+    Timepoint == "tP" ~ "Post-placebo" , 
+    Timepoint == "rB" ~ "Pre-BRB" , 
+    Timepoint == "tB" ~ "Post-BRB" , 
+    TRUE ~ "unknown"
+  ))
+```
+
+13.2 extract all rows that exclude 'NA' from peon sam
+```{r}
+metadata16.sep.dup <- metadata16.sep[metadata16.sep$ng.mL != "NA", ]
+```
+
+13.3 extract all rows that include pnt 77 from peon sam
+```{r}
+metadata16.sep.dup.77 <- metadata16.sep.dup[metadata16.sep.dup$numeric == 77, ]
+```
+
+13.4 plot for peon sam
+```{r}
+metadata16.sep.dup.77$ng.mL <- as.numeric(metadata16.sep.dup.77$ng.mL)
+ggplot(metadata16.sep.dup.77, aes(x = text, y = ng.mL, color = factor(numeric))) + 
+  geom_point() + 
+  scale_y_continuous(name = "ng.mL")
+```
+13.5 graph for peon sam
+```{r}
+merged.meta16.tpk$ng.mL <- as.numeric(merged.meta16.tpk$ng.mL)
+
+non_numeric_values <- merged.meta16.tpk[!is.na(as.numeric(merged.meta16.tpk$ng.mL)) & !is.finite(merged.meta16.tpk$ng.mL), "ng.mL"]
+if (length(non_numeric_values) > 0) {
+  print("Warning: 'ng.mL' column contains non-numeric values.")
+}
+avg_data <- merged.meta16.tpk %>%
+  group_by(timepoint_meaning) %>%
+  summarize(avg_value = mean(ng.mL, na.rm = TRUE))
+View(avg_data)
+ggplot(merged.meta16.tpk, aes(x = factor(timepoint_meaning, levels = c("Pre-placebo", "Post-placebo", "Pre-BRB", "Post-BRB")) , y = ng.mL)) +
+  geom_boxplot() +
+  labs(x = "Timepoint Meaning")
+```
+
+14.1 transform data for peon xyrut
+```{r}
+metadata17 <- metadata17[-c(1:13,15:37), ]
+metadata17.trans <- metadata17 %>%
+  gather(key = "column_ID", value = "value", 2:81)
+metadata17.sep <- metadata17.trans %>%
+  separate(column_ID, into = c("numeric", "text"), sep = "-", remove = FALSE)
+metadata17.sep <- metadata17.sep %>%
+  rename(ng.mL=value)
+metadata17.sep$text <- toupper(metadata17.sep$text)
+merged.meta17.tpk <- merge(metadata17.sep, timepoint.key, by = c("numeric", "text"))
+merged.meta17.tpk <- merged.meta17.tpk %>%
+  mutate(timepoint_meaning = case_when(
+    Timepoint == "rP" ~ "Pre-placebo" ,
+    Timepoint == "tP" ~ "Post-placebo" , 
+    Timepoint == "rB" ~ "Pre-BRB" , 
+    Timepoint == "tB" ~ "Post-BRB" , 
+    TRUE ~ "unknown"
+  ))
+```
+
+14.2 extract all rows that exclude 'NA' from peon xyrut
+```{r}
+metadata17.sep.dup <- metadata17.sep[metadata17.sep$ng.mL != "NA", ]
+```
+
+14.3 extract all rows that include pnt 66 from peon xyrut
+```{r}
+metadata17.sep.dup.66 <- metadata17.sep.dup[metadata17.sep.dup$numeric == 66, ]
+```
+
+14.4 plot for peon xyrut
+```{r}
+metadata17.sep.dup.66$ng.mL <- as.numeric(metadata17.sep.dup.66$ng.mL)
+ggplot(metadata17.sep.dup.66, aes(x = text, y = ng.mL, color = factor(numeric))) + 
+  geom_point() + 
+  scale_y_continuous(name = "ng.mL")
+```
+14.5 graph for peon xyrut
+```{r}
+merged.meta17.tpk$ng.mL <- as.numeric(merged.meta17.tpk$ng.mL)
+
+non_numeric_values <- merged.meta17.tpk[!is.na(as.numeric(merged.meta17.tpk$ng.mL)) & !is.finite(merged.meta17.tpk$ng.mL), "ng.mL"]
+if (length(non_numeric_values) > 0) {
+  print("Warning: 'ng.mL' column contains non-numeric values.")
+}
+avg_data <- merged.meta17.tpk %>%
+  group_by(timepoint_meaning) %>%
+  summarize(avg_value = mean(ng.mL, na.rm = TRUE))
+View(avg_data)
+ggplot(merged.meta17.tpk, aes(x = factor(timepoint_meaning, levels = c("Pre-placebo", "Post-placebo", "Pre-BRB", "Post-BRB")) , y = ng.mL)) +
+  geom_boxplot() +
+  labs(x = "Timepoint Meaning")
+```
+
+15.1 transform data for pga
+```{r}
+metadata18 <- metadata18[-c(1:14,16:37), ]
+metadata18.trans <- metadata18 %>%
+  gather(key = "column_ID", value = "value", 2:81)
+metadata18.sep <- metadata18.trans %>%
+  separate(column_ID, into = c("numeric", "text"), sep = "-", remove = FALSE)
+metadata18.sep <- metadata18.sep %>%
+  rename(ng.mL=value)
+metadata18.sep$text <- toupper(metadata18.sep$text)
+merged.meta18.tpk <- merge(metadata18.sep, timepoint.key, by = c("numeric", "text"))
+merged.meta18.tpk <- merged.meta18.tpk %>%
+  mutate(timepoint_meaning = case_when(
+    Timepoint == "rP" ~ "Pre-placebo" ,
+    Timepoint == "tP" ~ "Post-placebo" , 
+    Timepoint == "rB" ~ "Pre-BRB" , 
+    Timepoint == "tB" ~ "Post-BRB" , 
+    TRUE ~ "unknown"
+  ))
+```
+
+15.2 plot for pga 
+```{r}
+metadata18.sep$ng.mL <- as.numeric(metadata18.sep$ng.mL)
+ggplot(metadata18.sep, aes(x = text, y = ng.mL, color = factor(numeric))) + 
+  geom_point() + 
+  scale_y_continuous(name = "ng.mL")
+```
+15.3 graph for pga
+```{r}
+merged.meta18.tpk$ng.mL <- as.numeric(merged.meta18.tpk$ng.mL)
+
+non_numeric_values <- merged.meta18.tpk[!is.na(as.numeric(merged.meta18.tpk$ng.mL)) & !is.finite(merged.meta18.tpk$ng.mL), "ng.mL"]
+if (length(non_numeric_values) > 0) {
+  print("Warning: 'ng.mL' column contains non-numeric values.")
+}
+avg_data <- merged.meta18.tpk %>%
+  group_by(timepoint_meaning) %>%
+  summarize(avg_value = mean(ng.mL, na.rm = TRUE))
+View(avg_data)
+ggplot(merged.meta18.tpk, aes(x = factor(timepoint_meaning, levels = c("Pre-placebo", "Post-placebo", "Pre-BRB", "Post-BRB")) , y = ng.mL)) +
+  geom_boxplot() +
+  labs(x = "Timepoint Meaning")
+```
+
+16.1 transform data for vanillic acid
+```{r}
+metadata19 <- metadata19[-c(1:15,17:37), ]
+metadata19.trans <- metadata19 %>%
+  gather(key = "column_ID", value = "value", 2:81)
+metadata19.sep <- metadata19.trans %>%
+  separate(column_ID, into = c("numeric", "text"), sep = "-", remove = FALSE)
+metadata19.sep <- metadata19.sep %>%
+  rename(ng.mL=value)
+metadata19.sep$text <- toupper(metadata19.sep$text)
+merged.meta19.tpk <- merge(metadata19.sep, timepoint.key, by = c("numeric", "text"))
+merged.meta19.tpk <- merged.meta19.tpk %>%
+  mutate(timepoint_meaning = case_when(
+    Timepoint == "rP" ~ "Pre-placebo" ,
+    Timepoint == "tP" ~ "Post-placebo" , 
+    Timepoint == "rB" ~ "Pre-BRB" , 
+    Timepoint == "tB" ~ "Post-BRB" , 
+    TRUE ~ "unknown"
+  ))
+```
+
+16.2 plot for vanillic acid
+```{r}
+metadata19.sep$ng.mL <- as.numeric(metadata19.sep$ng.mL)
+ggplot(metadata19.sep, aes(x = text, y = ng.mL, color = factor(numeric))) + 
+  geom_point() + 
+  scale_y_continuous(name = "ng.mL")
+```
+16.3 graph for vanillic acid 
+```{r}
+merged.meta19.tpk$ng.mL <- as.numeric(merged.meta19.tpk$ng.mL)
+
+non_numeric_values <- merged.meta19.tpk[!is.na(as.numeric(merged.meta19.tpk$ng.mL)) & !is.finite(merged.meta19.tpk$ng.mL), "ng.mL"]
+if (length(non_numeric_values) > 0) {
+  print("Warning: 'ng.mL' column contains non-numeric values.")
+}
+avg_data <- merged.meta19.tpk %>%
+  group_by(timepoint_meaning) %>%
+  summarize(avg_value = mean(ng.mL, na.rm = TRUE))
+View(avg_data)
+ggplot(merged.meta19.tpk, aes(x = factor(timepoint_meaning, levels = c("Pre-placebo", "Post-placebo", "Pre-BRB", "Post-BRB")) , y = ng.mL)) +
+  geom_boxplot() +
+  labs(x = "Timepoint Meaning")
+```
+strat cy glc sulf
+```{r}
+merged.meta.tpk.difference <- merged.meta.tpk %>%
+  pivot_wider(names_from = timepoint_meaning, values_from = ng.mL)
+merged.meta.tpk.difference <- merged.meta.tpk.difference %>%
+  select(-`Pre-placebo`, -`Post-placebo`)
+merged.meta.tpk.difference.filtered <- subset(merged.meta.tpk.difference, !grepl("rP|tP", Timepoint))
+merged.meta.tpk.difference.filtered$`Post-BRB` <- as.numeric(merged.meta.tpk.difference.filtered$`Post-BRB`)
+merged.meta.tpk.difference.filtered$`Pre-BRB` <- as.numeric(merged.meta.tpk.difference.filtered$`Pre-BRB`)
+merged.meta.tpk.difference.filtered <- merged.meta.tpk.difference.filtered %>%
+  mutate(Post_BRB_aligned = lead(`Post-BRB`), Pre_BRB_aligned = lag(`Pre-BRB`))
+merged.meta.tpk.difference.filtered <- merged.meta.tpk.difference.filtered %>%
+  select(-Difference)
+merged.meta.tpk.difference.filtered <- merged.meta.tpk.difference.filtered %>%
+  mutate(Difference = Post_BRB_aligned - `Pre-BRB`)
+```
+
+strat cy hex 
+```{r}
+merged.meta6.tpk.difference <- merged.meta6.tpk %>%
+  pivot_wider(names_from = timepoint_meaning, values_from = ng.mL)
+merged.meta6.tpk.difference[is.na(merged.meta6.tpk.difference)] <- 0
+
+```
+

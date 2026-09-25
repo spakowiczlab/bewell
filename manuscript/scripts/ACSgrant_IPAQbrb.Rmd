@@ -1,0 +1,390 @@
+---
+title: 'ipaq BRB'
+author: "Caroline Wheeler"
+date: "10/9/2023"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+
+library(tidyverse)
+library(readxl)
+library(ggplot2)
+library(ggmosaic)
+library(scales)
+library(stringr)
+library(vegan)
+```
+
+
+```{r}
+clinical <- readRDS("../../data/derived/clinical_manuscript.rds")
+key <- clinical$samples
+key.long <- clinical$samples_long
+taxa <- read.csv("../../data/derived/bewell_taxonomy_relAbun.csv")
+ipaq <- clinical$subjects
+met <- read_excel("../../data/raw/urine-metabolomics/Dan Urine Anthocyanin 11-10-2022.xlsx", sheet = "concentration ng mL") %>%
+  filter(!is.na(`21-V2`))
+```
+
+## try metbolomics 
+```{r}
+met <- met %>%
+  mutate_at(vars(-...1), ~as.numeric(.)) %>%
+  mutate_at(vars(-...1), ~replace(., is.na(.), 0)) %>%
+  pivot_longer(
+    cols = 2:81, 
+    names_to = "Sample",
+    values_to = "value",
+    values_transform = ~ as.numeric(gsub(",", "", .x))
+  ) %>%
+  rename("metabolite" = `...1`) %>%
+  separate(Sample, c("Subject.Number", "v")) %>%
+  mutate(v = toupper(v))
+
+# prep key
+key.long <- key.long %>%
+  mutate(v =  toupper(substr(timepoints, 11, 12)),
+         v = ifelse(v == "-V", toupper(substr(timepoints, 12, 13)), v),
+         Subject.Number = as.character(Subject.Number)) %>%
+  select(Subject.Number, v, Timepoint) 
+
+# join to met 
+met <- met %>%
+  left_join(key.long) %>%
+  # filter to metabolites of interest
+  filter(metabolite == "cy rut",
+         Timepoint == "tB",
+         value <= 0)
+  # filter(metabolite %in% c("cy hex", "cy rut", "cy sam", "cy xyrut", "peon gluA", "peon hex", "peon rut", "peon sam", "peon xyrut")) %>%
+```
+
+keep only subjects that have both pre and post BRB
+```{r}
+key <- key %>%
+  filter(!is.na(rB),
+         !is.na(tB))
+```
+
+ipaq histogram
+```{r}
+ipaq <- ipaq %>% 
+  # filter to only those who have multiple samples 
+  filter(subject_number %in% key$Subject.Number,
+  # filter out pt with low adherence 
+         !subject_number %in% met$Subject.Number,
+  # filter to those with IPAQ score
+         !is.na(IPAQscore)) %>%
+  mutate(metsTotal = METwalking + METmoderate + METvig + METmins,
+         mets_simple = ifelse(metsTotal >= 5000, "active", "inactive"),
+         ipaq_simple = ifelse((IPAQscore == "Minimally active" | IPAQscore == "HEPA active"), "active", "inactive"),
+         ipaq_alt = ifelse(IPAQscore == "HEPA active" | metsTotal >= 5000, "active", "inactive"))
+
+# ipaq %>%
+#   ggplot(aes(x=metsTotal)) + geom_histogram()
+# 
+# ipaq %>% 
+#   ggplot(aes(x= mets_simple)) + geom_bar()
+# 
+# ipaq %>% 
+#   ggplot(aes(x= ipaq_simple)) + geom_bar()
+# 
+# ipaq %>% 
+#   ggplot(aes(x= ipaq_alt)) + geom_bar()
+table(ipaq$Activity)
+
+```
+
+```{r}
+key <- key %>%
+  filter(Subject.Number %in% ipaq$subject_number,
+         !Subject.Number %in% met$Subject.Number)
+```
+
+change in Blautia
+```{r}
+blaut_taxa <- taxa %>% 
+  dplyr::filter(substr(Taxonomy, nchar(Taxonomy)-9 ,nchar(Taxonomy)) == "g__Blautia")
+
+blaut_rB <- dplyr::filter(blaut_taxa, variable == "rB")
+blaut_tB <- dplyr::filter(blaut_taxa, variable == "tB")
+blaut_rP <- dplyr::filter(blaut_taxa, variable == "rP")
+blaut_tP <- dplyr::filter(blaut_taxa, variable == "tP")
+  
+blaut <- 
+  key %>%
+  mutate(rB = ifelse(key$rB %in% blaut_rB$id, blaut_rB$RelAbun, ifelse(is.na(key$rB), NA, 0))) %>%
+  mutate(tB = ifelse(key$tB %in% blaut_tB$id, blaut_tB$RelAbun, ifelse(is.na(key$tB), NA, 0))) %>%
+  mutate(rP = ifelse(key$rP %in% blaut_rP$id, blaut_rP$RelAbun, ifelse(is.na(key$rP), NA, 0))) %>%
+  mutate(tP = ifelse(key$tP %in% blaut_tP$id, blaut_tP$RelAbun, ifelse(is.na(key$tP), NA, 0))) %>%
+  select(-placebo)
+```
+
+change in Lachnospiraceae
+```{r}
+lach_taxa <- taxa %>%
+  dplyr::filter(substr(Taxonomy, nchar(Taxonomy)-17 ,nchar(Taxonomy)) == "f__Lachnospiraceae")
+
+lach_rB <- dplyr::filter(lach_taxa, variable == "rB")
+lach_tB <- dplyr::filter(lach_taxa, variable == "tB")
+lach_rP <- dplyr::filter(lach_taxa, variable == "rP")
+lach_tP <- dplyr::filter(lach_taxa, variable == "tP")
+  
+lach <- 
+  key %>%
+  mutate(rB = ifelse(key$rB %in% lach_rB$id, lach_rB$RelAbun, ifelse(is.na(key$rB), NA, 0))) %>%
+  mutate(tB = ifelse(key$tB %in% lach_tB$id, lach_tB$RelAbun, ifelse(is.na(key$tB), NA, 0))) %>%
+  mutate(rP = ifelse(key$rP %in% lach_rP$id, lach_rP$RelAbun, ifelse(is.na(key$rP), NA, 0))) %>%
+  mutate(tP = ifelse(key$tP %in% lach_tP$id, lach_tP$RelAbun, ifelse(is.na(key$tP), NA, 0))) %>%
+  select(-placebo)
+```
+
+change in Roseburia 
+```{r}
+rose_taxa <- taxa %>%
+  dplyr::filter(substr(Taxonomy, nchar(Taxonomy)-11 ,nchar(Taxonomy)) == "g__Roseburia")
+
+rose_rB <- dplyr::filter(rose_taxa, variable == "rB")
+rose_tB <- dplyr::filter(rose_taxa, variable == "tB")
+rose_rP <- dplyr::filter(rose_taxa, variable == "rP")
+rose_tP <- dplyr::filter(rose_taxa, variable == "tP")
+  
+rose <- 
+  key %>%
+  mutate(rB = ifelse(key$rB %in% rose_rB$id, rose_rB$RelAbun, ifelse(is.na(key$rB), NA, 0))) %>%
+  mutate(tB = ifelse(key$tB %in% rose_tB$id, rose_tB$RelAbun, ifelse(is.na(key$tB), NA, 0))) %>%
+  mutate(rP = ifelse(key$rP %in% rose_rP$id, rose_rP$RelAbun, ifelse(is.na(key$rP), NA, 0))) %>%
+  mutate(tP = ifelse(key$tP %in% rose_tP$id, rose_tP$RelAbun, ifelse(is.na(key$tP), NA, 0))) %>%
+  select(-placebo)
+```
+
+mic hists
+```{r}
+blaut %>%
+  ggplot(aes(x = abs(tB - rB))) +
+  geom_histogram() + 
+  xlab("Blautia") + 
+  geom_vline(xintercept =  5, linetype = "dashed", color = "red3")
+
+lach %>%
+  ggplot(aes(x = abs(tB - rB))) + 
+  geom_histogram() + 
+  xlab("Lachnospiraceae") +
+  geom_vline(xintercept =  9, linetype = "dashed", color = "red3")
+
+rose %>%
+  ggplot(aes(x = abs(tB - rB))) + 
+  geom_histogram() + 
+  xlab("Roseburia") +
+  geom_vline(xintercept =  3, linetype = "dashed", color = "red3")
+```
+
+```{r}
+ipaq <- ipaq %>%
+  rename("Subject.Number" = subject_number,
+         "Activity" = ipaq_alt)
+```
+
+
+```{r}
+blaut <- blaut %>%
+  mutate(dif = abs(tB - rB),
+         Blautia = ifelse(dif >= 5, "BRB effective", "BRB not effective")) %>%
+  left_join(ipaq)
+  
+lach <- lach %>%
+  mutate(dif = abs(tB - rB),
+         Lachnospiraceae = ifelse(dif >= 9, "BRB effective", "BRB not effective")) %>%
+  left_join(ipaq) 
+
+rose <- rose %>%
+  mutate(dif = abs(tB - rB),
+         Roseburia = ifelse(dif >= 3, "BRB effective", "BRB not effective")) %>%
+  left_join(ipaq) 
+```
+
+```{r}
+rose %>%
+  ggplot(aes(x=metsTotal, y = dif)) +
+  geom_point() +
+  geom_smooth(method='lm')
+```
+
+```{r}
+diff_thr <- 9
+var_thr  <- (diff_thr^2) / 2  
+
+per_patient_var <- taxa %>%
+  mutate(
+    Subject.Number = as.character(Subject.Number),
+    RelAbun = as.numeric(RelAbun)
+  ) %>%
+  filter(variable %in% c("rB", "tB"),
+         str_detect(Taxonomy, "f__Lachnospiraceae")) %>%
+  group_by(Subject.Number, variable) %>%
+  summarise(abun = sum(RelAbun, na.rm = TRUE), .groups = "drop") %>%
+  pivot_wider(names_from = variable, values_from = abun) %>%
+  filter(!is.na(rB), !is.na(tB)) %>%
+  mutate(
+    var_abun = (tB - rB)^2 / 2,
+    Lachnospiraceae = ifelse(var_abun >= var_thr, "BRB Effective", "BRB Not Effective")
+  )
+
+lach_plot <- per_patient_var %>%
+  left_join(ipaq %>% mutate(Subject.Number = as.character(Subject.Number)),
+            by = "Subject.Number") %>%
+  transmute(
+    Activity = case_when(
+      str_to_lower(str_trim(Activity)) == "active" ~ "Active",
+      str_to_lower(str_trim(Activity)) == "inactive" ~ "Inactive",
+      TRUE ~ NA_character_
+    ),
+    Lachnospiraceae
+  ) %>%
+  filter(!is.na(Activity))
+
+lach_plot$Activity <- factor(lach_plot$Activity, levels = c("Active", "Inactive"))
+lach_plot$Lachnospiraceae <- factor(lach_plot$Lachnospiraceae,
+                                    levels = c("BRB Not Effective", "BRB Effective"))
+
+plot_df <- lach_plot %>%
+  count(Activity, Lachnospiraceae) %>%
+  group_by(Activity) %>%
+  mutate(pct = n / sum(n))
+
+p1 <- ggplot(plot_df, aes(x = Activity, y = pct, fill = Lachnospiraceae)) +
+  geom_col(width = 0.6) +
+  scale_y_continuous(labels = percent_format(accuracy = 1)) +
+  scale_fill_manual(values = c("BRB Not Effective" = "grey70",
+                               "BRB Effective" = "steelblue")) +
+  labs(x = "Physical activity", y = "% of patients",
+       fill = "Lachnospiraceae change") +
+  theme_bw(base_size = 12)
+
+p1
+ggsave(
+  filename = "../figures/fig4F.svg",
+  plot = p1,
+  width = 6,
+  height = 4)
+class(taxa)
+```
+
+```{r}
+ggplot(per_patient_var, aes(x = var_abun)) +
+  geom_histogram(bins = 25, fill = "grey70", color = "black") +
+geom_vline(xintercept = var_thr, linetype = "dashed", color = "red")+
+  labs(
+    x = "Per-patient variance (Lachnospiraceae abundance)",
+    y = "Number of patients"
+  ) +
+  theme_bw(base_size = 11)
+
+```
+```{r}
+blaut <- blaut %>% select(Activity, Blautia)
+table(blaut)
+lach <- lach %>% select(Activity, Lachnospiraceae)
+table(lach)
+rose <- rose %>% select(Activity, Roseburia)
+table(rose)
+
+# mosaicplot(table(blaut),
+#   main = "Mosaic plot",
+#   color = TRUE
+# )
+
+mosaicplot(table(lach),
+  main = "Mosaic plot",
+  color = TRUE
+)
+
+# mosaicplot(table(rose),
+#   main = "Mosaic plot",
+#   color = TRUE,
+# )
+
+# glammed up mosaic plot
+lach <- lach %>%
+  mutate(Activity = ifelse(Activity == "active", "Active", "Inactive"),
+         Lachnospiraceae = ifelse(Lachnospiraceae == "BRB effective", "BRB Effective", "BRB Not Effective"))
+
+lach$Activity <- factor(lach$Activity, levels = c("Active", "Inactive"))
+lach$Lachnospiraceae <- factor(lach$Lachnospiraceae, levels = c("BRB Not Effective", "BRB Effective"))
+
+lach %>%
+  mutate(Activity = ifelse(Activity == "active", "Active", "Inactive"),
+         Lachnospiraceae = ifelse(Lachnospiraceae == "BRB effective", "BRB Effective", "BRB Not Effective")) %>%
+  ggplot() +
+  geom_mosaic(aes(x = product(Activity, Lachnospiraceae), fill = Activity, alpha = Lachnospiraceae), show.legend = FALSE) +
+  scale_fill_manual(values = c("cornflowerblue", "olivedrab4")) + 
+  scale_alpha_manual(values =c(.7,.9)) +
+  xlab("Lachnospiraceae enriched") +
+  ylab("IPAQ Score") +
+  theme(base_size = 11, legend.position = "none") +
+  theme_bw()
+
+ggsave("../../exploratory/figures/ACSgrant_mosaicplot.png", dev = "png", height = 4, width = 5, dpi=400)
+
+lach %>%
+  ggplot() +
+  geom_mosaic(aes(x = product(Activity, Lachnospiraceae), fill = Activity, alpha = Lachnospiraceae), show.legend = FALSE) +
+  geom_mosaic_text(aes(x = product(Activity, Lachnospiraceae)), size = 4.5) +
+  scale_fill_manual(values = c("lightskyblue", "salmon2")) + 
+  scale_alpha_manual(values =c(.7,.9)) +
+  xlab("") +
+  ylab("") +
+  theme(base_size = 9, legend.position = "none") +
+  theme_bw()
+
+ggsave("../../exploratory/figures/ACSgrant_mosaicplot2.png", dev = "png", height = 4, width = 5, dpi=400)
+
+fisher.test(table(lach))
+
+```
+
+```{r}
+fisher.test(table(blaut))
+fisher.test(table(lach))
+fisher.test(table(rose))
+```
+## try metbolomics 
+```{r}
+met <- met %>%
+  mutate_at(vars(-...1), ~as.numeric(.)) %>%
+  mutate_at(vars(-...1), ~replace(., is.na(.), 0)) %>%
+  pivot_longer(
+    cols = 2:81, 
+    names_to = "Sample",
+    values_to = "value",
+    values_transform = ~ as.numeric(gsub(",", "", .x))
+  ) %>%
+  rename("metabolite" = `...1`) %>%
+  separate(Sample, c("Subject.Number", "v")) %>%
+  mutate(v = toupper(v))
+
+# prep key
+key.long <- key.long %>%
+  mutate(v =  toupper(substr(Timepoint, 11, 12)),
+         v = ifelse(v == "-V", toupper(substr(Timepoint, 12, 13)), v),
+         Subject.Number = as.character(Subject.Number)) %>%
+  select(Subject.Number, v, Timepoint) 
+
+# join to met 
+met <- met %>%
+  left_join(key.long) %>%
+  # filter to metabolites of interest
+  filter(metabolite == "cy rut",
+         Timepoint == "tB",
+         value <= 0)
+
+
+  # filter(metabolite %in% c("cy hex", "cy rut", "cy sam", "cy xyrut", "peon gluA", "peon hex", "peon rut", "peon sam", "peon xyrut")) %>%
+  
+```
+
+metabolites of interest are:
+cy rut
+cy xy rut
+

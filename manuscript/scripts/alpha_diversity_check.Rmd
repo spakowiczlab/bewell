@@ -1,0 +1,117 @@
+---
+title: "diversity check"
+author: "Caroline Wheeler"
+date: "3/14/2022"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+read in data w/o row names
+```{r}
+list.files("data")
+king <- read.csv("../../data/derived/RelAbun/RelAbun_king.csv", row.names = 1)
+phyl <- read.csv("../../data/derived/RelAbun/RelAbun_phyl.csv",row.names = 1)
+class <- read.csv("../../data/derived/RelAbun/RelAbun_class.csv",row.names = 1)
+ord <- read.csv("../../data/derived/RelAbun/RelAbun_ord.csv", row.names = 1)
+fam <- read.csv("../../data/derived/RelAbun/RelAbun_fam.csv", row.names = 1)
+gen <- read.csv("../../data/derived/RelAbun/RelAbun_gen.csv", row.names = 1)
+spec <- read.csv("../../data/derived/RelAbun/RelAbun_spec.csv", row.names = 1)
+
+taxa <- cbind(king, phyl, class, ord, fam, gen, spec)
+  
+taxa <- taxa %>%
+  mutate(time = rownames(taxa)) %>%
+  mutate(time = substr(time, nchar(time)-1, nchar(time)))
+```
+
+
+
+calculate alpha diversity using simpsons index
+```{r}
+taxa$alpha <- diversity(taxa %>% select(-time), index = "simpson")
+```
+
+```{r}
+taxa$alpha_shannon <- diversity(taxa %>% select(-time), index = "shannon")
+```
+
+
+```{r}
+library(ggplot2)
+
+taxa %>%
+  mutate(time = factor(time, levels = c("rP", "tP", "rB", "tB"))) %>%
+  ggplot(aes(x = time, y = alpha, fill = time)) +
+  geom_boxplot() +
+  geom_jitter(width = 0.2) +
+  theme_bw() +
+  labs(y = "Simpson Diversity", x = "") +
+  theme(
+    legend.position = "none"
+  )
+
+ggsave("../figures/fig4C.svg",
+       width = 5, height = 4)
+```
+
+prep for t-test
+```{r}
+div_results <- taxa %>%
+  select(time, alpha) 
+
+div_results_BRB <- div_results %>%
+  filter(time == "rB" | time == "tB") 
+
+div_results_plac <- div_results %>%
+  filter(time == "rP" | time == "tP") 
+```
+
+compare avg pre/post BRB
+```{r}
+# avgBRB <- div_results_BRB %>%
+#   group_by(variable) %>%
+#   summarise(mean(alpha))
+# 
+# avgPlac <- div_results_plac %>%
+#   group_by(variable) %>%
+#   summarise(mean(alpha))
+
+rB <-  div_results %>%
+  filter(time == "rB")
+rB <- rB$alpha
+tB <- div_results %>%
+  filter(time == "tB")
+tB <- tB$alpha
+rP <- div_results %>%
+  filter(time == "rP")
+rP <- rP$alpha
+tP <- div_results %>%
+  filter(time == "tP")
+tP <- tP$alpha
+
+
+Hutcheson_t_test(
+  rB,
+  tB,
+  shannon.base = exp(1),
+  alternative = "two.sided",
+  difference = 0
+)
+
+Hutcheson_t_test(
+  rP,
+  tP,
+  shannon.base = exp(1),
+  alternative = "two.sided",
+  difference = 0
+)
+```
+
+```{r}
+t.test(rB, tB)
+t.test(rP, tP)
+```
+

@@ -1,0 +1,141 @@
+---
+title: "ranked lists"
+author: "Caroline Wheeler"
+date: "3/15/2022"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+
+library(tidyverse)
+library(reshape2)
+```
+
+```{r}
+#taxa <- read.csv("/fs/ess/PAS1695/projects/bewell/data/bewell_taxonomy_relAbun.csv")
+king <- read.csv("/fs/ess/PAS1695/projects/bewell/data/RelAbun/RelAbun_king.csv", row.names = 1)
+phyl <- read.csv("/fs/ess/PAS1695/projects/bewell/data/RelAbun/RelAbun_phyl.csv",row.names = 1)
+class <- read.csv("/fs/ess/PAS1695/projects/bewell/data/RelAbun/RelAbun_class.csv",row.names = 1)
+ord <- read.csv("/fs/ess/PAS1695/projects/bewell/data/RelAbun/RelAbun_ord.csv", row.names = 1)
+fam <- read.csv("/fs/ess/PAS1695/projects/bewell/data/RelAbun/RelAbun_fam.csv", row.names = 1)
+gen <- read.csv("/fs/ess/PAS1695/projects/bewell/data/RelAbun/RelAbun_gen.csv", row.names = 1)
+spec <- read.csv("/fs/ess/PAS1695/projects/bewell/data/RelAbun/RelAbun_spec.csv", row.names = 1)
+
+taxa <- cbind(king, phyl, class, ord, fam, gen, spec)
+
+mics <- colnames(taxa)
+
+taxa <- taxa %>%
+  mutate(
+    subject = sub("-.*", "", rownames(taxa)),
+    timepoint = sub(".*-", "", rownames(taxa)) 
+  )
+```
+
+
+```{r}
+make_df <- function(df, mic) {
+  mic_df <- df %>%
+    select(subject, timepoint, mic)
+  
+  mic_df <- dcast(mic_df, subject ~ timepoint)
+  
+  mic_df <- mic_df %>%
+    mutate(
+      BRB = tB - rB,
+      Plac = tP - rP) %>%
+    select(subject, rB, tB, BRB, rP, tP, Plac)
+  
+  return(mic_df)
+}
+
+get_rank_BRB <- function(df) {
+  df <- df %>% 
+    select(subject, BRB, Plac) %>%
+    mutate(BRBchange = abs(BRB),
+         PLACchange = abs(Plac)) %>%
+    arrange(-BRBchange)
+  
+  return(df)
+}
+```
+
+```{r message=FALSE, error=FALSE, eval=FALSE}
+delta <- data.frame(matrix(ncol = 2, nrow = 0))
+colnames(delta) <- c("microbe", "BRBchange")
+
+for (microbe in mics) {
+  temp <- make_df(taxa, microbe)
+  temp <- get_rank_BRB(temp)
+  temp$microbe <- microbe
+  delta <- rbind(delta, temp) %>%
+  arrange(-BRBchange)
+}
+```
+
+```{r}
+write_csv(delta, "/fs/ess/PAS1695/projects/bewell/data/rankedDeltaMicrobe.csv")
+```
+
+Akkermansia example
+```{r}
+AKK <- make_df(taxa, "s__Akkermansia_muciniphila")
+AKK <- get_rank_BRB(AKK)
+```
+```{r}
+write.csv(AKK, "../data/derived/change_in_AKK.csv")
+```
+
+
+Subject 55
+```{r}
+sub55 <- delta %>%
+  filter(subject == 55)
+```
+
+
+## Cytokines
+
+read in cytokine data and transform
+```{r}
+cyto <- read.csv("../data/derived/cytokines_avg-results.csv") %>%
+  rename("subject.number" = Sample) %>%
+  select(-X)
+
+bars <- read.csv("../data/derived/bewell_barcodes.csv") %>%
+  rename("subject.number" = timepoint,
+        "timepoint" = Subject.Number)
+
+#lose samples that aren't used: i.e 05-3.1 
+cyto <- merge(cyto, bars) %>%
+  mutate(subject = sub("-.*", "", subject.number)) %>%
+  select(-value, -subject.number)
+
+cyto<- spread(cyto, key = cytokine, value = avg.res) 
+cyto[is.na(cyto)] <- 0
+```
+
+
+# all cytokines
+```{r}
+cytokines <- cyto %>% select(-timepoint, -subject)
+cytokines <- colnames(cytokines)
+
+deltaCyto <- data.frame(matrix(ncol = 2, nrow = 0))
+colnames(deltaCyto) <- c("cytokine", "BRBchange")
+
+for (cyt in cytokines) {
+  temp <- make_df(cyto, cyt)
+  temp <- get_rank_BRB(temp)
+  temp$cytokine <- cyt
+  deltaCyto <- rbind(deltaCyto, temp) %>%
+  arrange(-BRBchange)
+}
+```
+
+```{r}
+write.csv(deltaCyto, "../data/derived/cytokineChange_ranked.csv")
+write.csv(deltaCyto, "/fs/ess/PAS1695/projects/bewell/data/cytokineChange_ranked.csv")
+```
+

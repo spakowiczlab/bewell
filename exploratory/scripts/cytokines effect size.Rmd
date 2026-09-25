@@ -1,0 +1,696 @@
+---
+title: "cytokines effect size"
+author: "Bailey Conrad"
+date: "May 31, 2022"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+
+library(tidyverse)
+library(glmm)
+library(broom)
+library(rlist)
+library(ggrepel)
+library(ggtext)
+library(ggplot2)
+library(ggpubr)
+library(lme4)
+library(broom.mixed)
+library(dplyr)
+library(readr)
+library(vegan)
+```
+
+
+```{r}
+cytokines <- read.csv("../data/derived/cytokines_avg-results.csv")
+samplabs <- readRDS("../../data/derived/clinical_manuscript.rds")$samples
+```
+
+Converting data into wide format from long format. 
+```{r}
+cytokines %>% select(-X) %>% pivot_wider(names_from = cytokine, values_from = avg.res) ###???
+```
+
+
+```{r}
+samplab.form <- samplabs %>%
+  select(Subject.Number, placebo) %>%
+  mutate(preP = ifelse(placebo == "Week 0", 1, 3), #quote bc exact string #==; is equal to operator #true = 1, false =3
+         postP = ifelse(placebo == "Week 0", 2, 4), 
+         preBRB = ifelse(placebo == "Week 0", 3, 1),
+        postBRB = ifelse(placebo == "Week 0", 4, 2)) %>%
+  pivot_longer(names_to = "timepoint.label", values_to = "timepoints", cols = c("preP", "postP", "preBRB", "postBRB")) %>%
+  mutate(Sample = paste0(Subject.Number, "-", timepoints)) %>%
+  select(Sample, timepoint.label) 
+
+
+cyto.form <- cytokines %>%
+ select(-X) %>% pivot_wider(names_from = cytokine, values_from = avg.res) %>%
+  mutate(Sample = gsub("^0", "", Sample), Sample = gsub("\\.1$", "", Sample)) %>%
+  left_join(samplab.form) %>%
+  mutate(berry.group = ifelse(grepl("postBRB",timepoint.label), 1, 0))
+```
+
+```{r}
+object <- c("ALCAM.CD166", "C.Reactive.Protein.CRP", "CCL2.JE.MCP.1", "Complement.Component.C9", "Cystatin.C", "IL.1.beta.IL.1F2", "IL.10", "IL.12.IL.23.p40", "IL.6", "MMP.2", "S100A9", "TNF.alpha", "vWF.A2", "IL.17F")
+
+capture.models.univ <- function(outcome, lfun, cytos, modin) {
+  mods.list <- lapply(cytos, function(x)  try({glm(as.formula(paste0(outcome, " ~ ", x)), family = lfun, data = modin) %>% tidy()}))
+  
+mods.list.clean <- list.clean(mods.list, function(x) is.null(x))
+mods.df <- bind_rows(mods.list.clean)
+return(mods.df)
+}
+```
+
+
+```{r warning=FALSE}
+plot <- capture.models.univ(outcome = "berry.group", lfun = "binomial", cytos = object, modin = cyto.form) %>%
+  filter(p.value<1.0) %>%
+  filter(term !="(Intercept)") %>%
+  # mutate(term = fct_reorder(term, estimate)) %>%
+  mutate(pointlabs = ifelse(-log(p.value) > 0.5, term, NA)) %>%
+  
+ggplot(aes(x = estimate, y = -log(p.value), label = pointlabs, color = term)) +
+  geom_point() +
+  theme_bw(base_size = 18) +
+  labs(x = "Estimate", y = "-log(p-value)") 
+
+
+```
+
+```{r}
+plot +
+  geom_label_repel() +
+  geom_hline(yintercept = 0.5) +
+  theme(legend.position="none") +
+  # ggtitle("Effect Size of Cytokines in Current and Former Smokers") +
+  # theme(plot.title = element_text(hjust = 0.5)) +
+  scale_color_viridis_d(option = "turbo")
+
+ggsave("../figures/cytokine_effect-size_volcano-plot.png")
+```
+
+
+#SCRATCH WORK BELOW
+```{r}
+ # separate(term, into = c("TaxaLevel", "term"), sep = "__") %>%
+  # mutate(term = fct_reorder(term, estimate),
+  #        ) %>%
+# ggplot(aes(x = estimate, y = term)) +
+#   geom_col() +
+#   labs(x = "Effect Size", y = "Microbe") +
+#   # scale_fill_manual(breaks = c("g", "s"), values = c("firebrick", "grey70"), name = "Taxonomic level", labels = c("Genus", "Species")) +
+#   theme_bw()  +
+#   theme(axis.text.y = element_markdown())
+# ggsave("../figures/effect-size_cytokines.png")
+```
+
+#SJ
+## mixed-effects model
+```{r}
+cyto_model_data <- cyto.form %>%
+  filter(timepoint.label %in% c("preBRB", "postBRB")) %>%
+  mutate(pt = sub("-.*", "", Sample))  # Extracts Subject.Number
+
+run_mixed_model <- function(cytokine_name, data) {
+  formula <- as.formula(paste0("berry.group ~ ", cytokine_name, " + (1 | pt)"))
+  model <- glmer(formula, data = data, family = binomial)
+  return(tidy(model))
+}
+
+# Apply to all cytokines
+cyto_mixed_results_all <- lapply(object, function(cyt) {
+  res <- tryCatch(run_mixed_model(cyt, cyto_model_data), error = function(e) NULL)
+  if (!is.null(res)) res$cytokine <- cyt
+  return(res)
+}) %>%
+  bind_rows()
+
+```
+
+```{r}
+cyto_effects_all <- cyto_mixed_results_all %>%
+  filter(!(term %in% c("(Intercept)", "sd__(Intercept)"))) %>%
+  select(cytokine, estimate, std.error, statistic, p.value) %>%
+  arrange(p.value)
+
+```
+
+```{r}
+cyto_effects_all %>%
+  mutate(label = ifelse(-log10(p.value) > 0.5, cytokine, NA)) %>%
+  ggplot(aes(x = estimate, y = -log10(p.value), label = label)) +
+  geom_point(aes(color = estimate)) +
+  geom_hline(yintercept = 0.5, linetype = "dashed") +
+  geom_label_repel() +
+  theme_bw(base_size = 16) +
+  labs(
+    x = "Log-odds estimate (Effect Size)",
+    y = "-log10(p-value)",
+    title = "Volcano Plot of Cytokine Effects (Mixed Model)"
+  )
+ggsave("../figures/volcano_all_cytokines.svg")
+
+```
+
+```{r}
+cyto_effects_all %>%
+  mutate(label = cytokine) %>%
+  ggplot(aes(x = estimate, y = -log10(p.value), label = label)) +
+  geom_point(aes(color = estimate)) +
+  geom_label_repel(size = 5,   # increase only annotation label text size
+                   box.padding = 0.4, 
+                   max.overlaps = Inf) +
+  geom_hline(yintercept = 0.5, linetype = "dashed") +
+  theme_bw(base_size = 16) +   # keep normal base size for axes/legend
+  labs(
+    x = "Effect Size (estimate)",
+    y = "-log10(p-value)"
+  )
+
+
+ggsave("../figures/volcano_all_cytokines1.svg")
+
+
+
+```
+```{r}
+cytokine_change_df <- cyto.form %>%
+  filter(timepoint.label %in% c("preBRB", "postBRB")) %>%
+  mutate(Subject.Number = sub("-.*", "", Sample)) %>%
+  select(Subject.Number, timepoint.label, all_of(object)) %>%
+  pivot_wider(names_from = timepoint.label, values_from = all_of(object))
+
+
+```
+
+
+```{r}
+cyto_model_base <- cyto.form %>%
+  filter(timepoint.label %in% c("preBRB", "postBRB")) %>%
+  mutate(pt = sub("-.*", "", Sample),
+         pt = as.factor(pt))  # Ensure pt is a factor
+
+#read compliance_cluster_df from Polyphenole
+compliance_cluster_df <- read.csv("../data/derived/compliance_cluster_df.csv")
+
+
+compliance_cluster_df <- as.data.frame(compliance_cluster_df)
+compliance_cluster_df$pt <- rownames(compliance_cluster_df)
+
+# Get responder IDs
+responder_ids <- rownames(compliance_cluster_df[compliance_cluster_df$BRB_response == "Responder", ])
+
+# Subset modeling data to responders only
+cyto_model_data_responder <- cyto_model_base %>%
+  filter(pt %in% responder_ids)
+
+# Apply mixed model to responder subset
+cyto_mixed_results_responders <- lapply(object, function(cyt) {
+  res <- tryCatch(
+    run_mixed_model(cyt, cyto_model_data_responder),
+    error = function(e) NULL   # skip if model fails
+  )
+  if (!is.null(res)) res$cytokine <- cyt
+  res
+}) %>%
+  bind_rows()
+
+
+
+
+
+```
+
+```{r}
+cyto_effects_responders <- cyto_mixed_results_responders %>%
+  filter(!(term %in% c("(Intercept)", "sd__(Intercept)"))) %>%
+  select(cytokine, estimate, std.error, statistic, p.value) %>%
+  arrange(p.value)
+
+ggplot(cyto_effects_responders, aes(x = estimate, y = -log10(p.value), label = cytokine)) +
+  geom_point(aes(color = estimate)) +
+  geom_hline(yintercept = -log10(0.05), linetype = "dashed") +
+  geom_label_repel(data = subset(cyto_effects_responders, -log10(p.value) > 0.5)) +
+  theme_bw(base_size = 18) +
+  labs(
+    x = "Effect Size (estimate)",
+    y = "-log10(p-value)")
+ggsave("../figures/volcano_cytokines.svg")
+
+
+```
+```{r}
+table(compliance_cluster_df_no_cyglcsulf$BRB_response_no_cyglcsulf)
+
+nrow(cyto_model_data_responder_no_cy)
+length(unique(cyto_model_data_responder_no_cy$pt))
+
+
+# Read new responder groups
+compliance_cluster_df_no_cyglcsulf <- read.csv(
+  "../data/derived/compliance_cluster_df_no_cyglcsulf.csv",
+  row.names = 1
+)
+
+# Add participant ID column
+compliance_cluster_df_no_cyglcsulf$pt <- rownames(compliance_cluster_df_no_cyglcsulf)
+
+# Get responder IDs from NEW clustering
+responder_ids_no_cy <- compliance_cluster_df_no_cyglcsulf %>%
+  filter(BRB_response_no_cyglcsulf == "Responder_no_cyglcsulf") %>%
+  pull(pt)
+
+# Subset cytokine data to NEW responders
+cyto_model_data_responder_no_cy <- cyto_model_base %>%
+  filter(pt %in% responder_ids_no_cy)
+
+# Run mixed model
+cyto_mixed_results_responders_no_cy <- lapply(object, function(cyt) {
+  res <- tryCatch(
+    run_mixed_model(cyt, cyto_model_data_responder_no_cy),
+    error = function(e) NULL
+  )
+  if (!is.null(res)) res$cytokine <- cyt
+  res
+}) %>%
+  bind_rows()
+
+cyto_effects_responders_no_cy <- cyto_mixed_results_responders_no_cy %>%
+  filter(!(term %in% c("(Intercept)", "sd__(Intercept)"))) %>%
+  select(cytokine, estimate, std.error, statistic, p.value) %>%
+  arrange(p.value)
+
+ggplot(cyto_effects_responders_no_cy,
+       aes(x = estimate, y = -log10(p.value), label = cytokine)) +
+  geom_point(aes(color = estimate)) +
+  geom_hline(yintercept = -log10(0.05), linetype = "dashed") +
+  geom_label_repel(
+    data = subset(cyto_effects_responders_no_cy, -log10(p.value) > 0.5)
+  ) +
+  theme_bw(base_size = 18) +
+  labs(
+    x = "Effect Size (estimate)",
+    y = "-log10(p-value)"
+  )
+
+ggsave("../figures/volcano_cytokines_no_cyglcsulf_responders.svg")
+```
+
+
+```{r}
+cyto_prepost <- cyto.form %>% filter(timepoint.label %in% c("preBRB", "postBRB"))
+#Extract Subject.Number
+cyto_clean <- cyto_prepost %>% mutate(Subject.Number = sub("-.*", "", Sample))
+
+#Pivot longer so cytokines become rows 
+cyto_long <- cyto_clean %>% pivot_longer( cols = ALCAM.CD166:vWF.A2, names_to = "cytokine", values_to = "value" )
+
+#Pivot wider to get pre/post in columns
+cyto_wide <- cyto_long %>%
+  group_by(Subject.Number, cytokine, timepoint.label) %>%
+  summarise(value = mean(as.numeric(value), na.rm = TRUE), .groups = "drop") %>%
+  pivot_wider(
+    names_from = timepoint.label,
+    values_from = value
+  ) %>%
+  mutate(change = postBRB - preBRB)
+
+cyto_heat <- cyto_wide %>%
+  select(Subject.Number, cytokine, change) %>%
+  pivot_wider(names_from = cytokine, values_from = change) %>%
+  column_to_rownames("Subject.Number") %>%
+  as.matrix()
+
+pheatmap(
+  cyto_heat,
+  annotation_colors = annotation_colors,
+  cluster_rows = TRUE,
+  cluster_cols = TRUE,
+  color = colorRampPalette(c("blue", "white", "red"))(100),
+  main = "Cytokine Change (PostBRB - PreBRB)",
+  fontsize_row = 9
+)
+
+```
+```{r}
+# Z-score
+cyto_heat_scaled <- scale(cyto_heat)
+
+# Create heatmap object silently
+ph1 <- pheatmap(
+  cyto_heat_scaled,
+  annotation_colors = annotation_colors,
+  cluster_rows = TRUE,
+  cluster_cols = TRUE,
+  color = colorRampPalette(c("navyblue", "white", "orange2"))(100),
+  labels_row = rep("", nrow(cyto_heat_scaled)),
+  silent = TRUE
+)
+
+# Save as SVG using svglite
+svglite::svglite("../figures/heatmap_cytokines.svg", width = 6, height = 5)
+grid::grid.draw(ph1$gtable)
+dev.off()
+
+
+
+```
+
+```{r}
+svg("../figures/heatmap_cytokines.svg", width = 6, height = 5)  
+pheatmap(
+  cyto_heat_scaled,
+  annotation_colors = annotation_colors,
+  cluster_rows = TRUE,
+  cluster_cols = TRUE,
+  color = colorRampPalette(c("navyblue", "white", "orange2"))(100),
+  fontsize_row = 5
+)
+dev.off()
+
+```
+
+```{r}
+# Highest effect size (change)
+top_cytos <- cyto_effects_all %>%
+  arrange(p.value) %>%
+  slice(1:2) %>%  # top 2 changing cytokines
+  pull(cytokine)
+
+# One non-significant cytokine
+no_change_cyto <- cyto_effects_all %>%
+  filter(p.value > 0.5, !(cytokine %in% top_cytos)) %>%
+  slice(1) %>%
+  pull(cytokine)
+
+cyto_order <- c(top_cytos, no_change_cyto)
+
+# Prepare data
+cyto_box_data <- cyto_long %>%
+  filter(cytokine %in% cyto_order) %>%
+  mutate(
+    cytokine = factor(cytokine, levels = cyto_order),
+    Timepoint = recode(timepoint.label, "preBRB" = "Pre-BRB", "postBRB" = "Post-BRB")
+  )
+
+# Plot
+ggplot(cyto_box_data, aes(x = Timepoint, y = value)) +
+  geom_boxplot(fill = "cyan4", outlier.shape = NA) +
+  geom_jitter(width = 0.2, size = 1.5, alpha = 0.6) +
+  facet_wrap(~ cytokine, scales = "free_y") +
+  labs(x = "Timepoint", y = "Cytokine level (ng/mL)") +
+  theme_bw(base_size = 11)
+
+# Save
+ggsave("../figures/cytokines_3boxplot.svg", height = 4, width = 6, dpi = 400)
+
+
+```
+
+```{r}
+# Load demographics, keep "Subject ID" as-is
+meta <- readRDS("../../data/derived/clinical_manuscript.rds")$subjects %>%
+  mutate(
+    `Subject ID` = gsub("HONC60-", "", `Subject ID`),
+    `Subject ID` = as.numeric(`Subject ID`)
+  )
+
+cyto_change_df <- as.data.frame(cyto_heat_scaled) %>%
+  rownames_to_column("Subject ID") %>%
+  mutate(`Subject ID` = as.numeric(`Subject ID`))
+
+# Merge cytokine change with demographics
+cyto_full <- cyto_change_df %>%
+  left_join(meta, by = "Subject ID") %>%
+  rename(
+    Smoking = `Smoking status`,
+    RaceEth = `Race/ethnicity`
+  )
+
+# check
+cyto_full %>%
+  select(`Subject ID`, Smoking, Age, RaceEth, Gender) %>%
+  head()
+```
+
+```{r}
+## cytokine-matrix-complete
+# object = character vector of cytokine column names
+cyto_numeric <- cyto_full %>%
+  select(all_of(object))
+
+# Keep only rows with complete cytokine data
+complete_idx <- complete.cases(cyto_numeric)
+cyto_numeric_complete <- cyto_numeric[complete_idx, , drop = FALSE]
+
+meta_complete <- cyto_full[complete_idx, ] %>%
+  select(`Subject ID`, Smoking, Age, RaceEth, Gender)
+```
+
+```{r}
+## pca-most-discriminatory-demographic
+# PCA on cytokine change
+pca <- prcomp(cyto_numeric_complete, scale. = FALSE)
+
+pca_df <- as.data.frame(pca$x) %>%
+  bind_cols(meta_complete)
+
+# Test which demographic best discriminates PC1
+disc_pvals <- c(
+  Smoking = summary(aov(PC1 ~ Smoking, data = pca_df))[[1]]$`Pr(>F)`[1],
+  RaceEth = summary(aov(PC1 ~ RaceEth, data = pca_df))[[1]]$`Pr(>F)`[1],
+  Age     = summary(aov(PC1 ~ Age,     data = pca_df))[[1]]$`Pr(>F)`[1],
+  Gender  = summary(aov(PC1 ~ Gender,  data = pca_df))[[1]]$`Pr(>F)`[1]
+)
+
+best_var <- names(which.min(disc_pvals))
+
+ggplot(pca_df,
+       aes(x = PC1, y = PC2, color = .data[[best_var]])) +
+  geom_point(size = 3, alpha = 0.9) +
+  stat_chull(aes(fill = .data[[best_var]]),
+             geom = "polygon", alpha = 0.15, color = NA) +
+  theme_bw(base_size = 16) +
+  labs(
+    title = paste("PCA of Cytokine Change by", best_var),
+    color = best_var,
+    fill  = best_var
+  )
+```
+
+```{r}
+## cca-without-urinepoly
+# Prepare matrix for CCA
+cyto_mat <- as.matrix(cyto_numeric_complete)
+
+# Drop rows with all zeros
+keep_rows <- rowSums(cyto_mat, na.rm = TRUE) > 0
+cyto_mat_cca <- cyto_mat[keep_rows, , drop = FALSE]
+meta_cca     <- meta_complete[keep_rows, ]
+
+# Shift to strictly positive (CCA expects non-negative "community" data)
+min_val <- min(cyto_mat_cca, na.rm = TRUE)
+if (min_val <= 0) {
+  cyto_mat_cca <- cyto_mat_cca - min_val + 1e-6
+}
+
+# CCA with demographics only
+cca_model_demo <- cca(cyto_mat_cca ~ Smoking + RaceEth + Age + Gender,
+                      data = meta_cca)
+
+cca_terms_demo <- anova(cca_model_demo, by = "term")
+
+cca_effect_demo <- as.data.frame(cca_terms_demo) %>%
+  rownames_to_column("Variable") %>%
+  filter(Variable != "Residual")
+
+ggplot(cca_effect_demo,
+       aes(x = reorder(Variable, F), y = F)) +
+  geom_col(fill = "#4C72B0") +
+  coord_flip() +
+  theme_bw(base_size = 16) +
+  labs(
+    x = NULL,
+    y = "Effect size",
+    title = "CCA effect sizes for cytokine change (demographics only)"
+  )
+```
+
+```{r}
+## urine-polyphenols-pc1
+# read rb_tb_wide : metabolite, Subject.Number, rB, tB, change
+rb_tb_wide <- read.csv("../data/derived/rb_tb_wide.csv")
+
+# Make subject x metabolite change matrix
+met_mat <- rb_tb_wide %>%
+  select(Subject.Number, metabolite, change) %>%
+  pivot_wider(names_from = metabolite, values_from = change) %>%
+  column_to_rownames("Subject.Number") %>%
+  as.matrix()
+
+met_pca <- prcomp(met_mat, scale. = TRUE)
+
+urine_polyphenol_df <- data.frame(
+  Subject.Number = as.numeric(rownames(met_pca$x)),
+  UrinePoly      = met_pca$x[, 1]   # PC1
+)
+
+# Merge UrinePoly into cyto_full
+cyto_full_poly <- cyto_full %>%
+  left_join(urine_polyphenol_df,
+            by = c("Subject ID" = "Subject.Number"))
+```
+
+```{r}
+##cca-with-urinepoly-multivariate
+# Keep rows with complete cytokines and all covariates (including UrinePoly)
+cca_data_all <- cyto_full_poly %>%
+  filter(
+    !if_any(all_of(object), is.na),
+    !if_any(c(Smoking, RaceEth, Age, Gender, UrinePoly), is.na)
+  )
+
+cyto_mat_all <- as.matrix(cca_data_all %>% select(all_of(object)))
+
+# Remove rows where all cytokines are zero
+keep_rows_all <- rowSums(cyto_mat_all, na.rm = TRUE) > 0
+cyto_mat_all2 <- cyto_mat_all[keep_rows_all, , drop = FALSE]
+cca_data_all2 <- cca_data_all[keep_rows_all, ]
+
+# Ensure strictly positive values
+min_val_all <- min(cyto_mat_all2, na.rm = TRUE)
+if (min_val_all <= 0) {
+  cyto_mat_all2 <- cyto_mat_all2 - min_val_all + 1e-6
+}
+
+# Single multivariate CCA with all predictors
+cca_full <- cca(
+  cyto_mat_all2 ~ Smoking + RaceEth + Age + Gender + UrinePoly,
+  data = cca_data_all2
+)
+
+cca_terms_full <- anova(cca_full, by = "term")
+
+cca_effect_full <- as.data.frame(cca_terms_full) %>%
+  rownames_to_column("Variable") %>%
+  filter(Variable != "Residual")
+
+ggplot(cca_effect_full,
+       aes(x = reorder(Variable, F), y = F)) +
+  geom_col(fill = "#4C72B0") +
+  coord_flip() +
+  theme_bw(base_size = 16) +
+  labs(
+    x = NULL,
+    y = "Effect size (F)",
+  )
+
+ggsave("../figures/urine_polyphenols_effect_size plo.svg", width = 6, height = 4)
+
+```
+
+```{r}
+##pca-by-urinepoly-groups
+# PCA subset with UrinePoly present and complete cytokines
+pca_data <- cyto_full_poly %>%
+  filter(
+    !if_any(all_of(object), is.na),
+    !is.na(UrinePoly)
+  ) %>%
+  mutate(
+    # Two groups: Low vs High urine polyphenols
+    PolyGroup = ntile(UrinePoly, 2),
+    PolyGroup = factor(PolyGroup, labels = c("Low", "High"))
+  )
+
+cyto_mat_pca <- as.matrix(pca_data %>% select(all_of(object)))
+pca_poly <- prcomp(cyto_mat_pca, scale. = TRUE)
+
+pca_df1 <- as.data.frame(pca_poly$x) %>%
+  bind_cols(
+    pca_data %>%
+      select(`Subject ID`, Smoking, Age, RaceEth, Gender, UrinePoly, PolyGroup)
+  )
+
+ggplot(pca_df1, aes(x = PC1, y = PC2, color = PolyGroup)) +
+  geom_point(size = 3, alpha = 0.9) +
+  stat_chull(aes(fill = PolyGroup),
+             geom = "polygon", alpha = 0.18, color = NA) +
+  theme_bw(base_size = 12) +
+  labs(
+    x = "PC1", y = "PC2",
+    color = "Urine polyphenols",
+    fill  = "Urine polyphenols"
+  ) +
+  scale_color_manual(values = c("High" = "red", "Low" = "purple3")) +
+  scale_fill_manual(values  = c( "High" = "red", "Low" = "purple3"))
+
+
+ggsave("../figures/urine_polyphenols_hull_PCA_plot.svg", width = 6, height = 4)
+
+
+```
+```{r}
+library(dplyr)
+library(ggplot2)
+library(vegan)
+
+## pca-by-urinepoly-groups
+# PCA subset with UrinePoly present and complete cytokines
+pca_data <- cyto_full_poly %>%
+  filter(
+    !if_any(all_of(object), is.na),
+    !is.na(UrinePoly)
+  ) %>%
+  mutate(
+    PolyGroup = ntile(UrinePoly, 2),
+    PolyGroup = factor(PolyGroup, labels = c("Low", "High"))
+  )
+
+cyto_mat_pca <- as.matrix(pca_data %>% select(all_of(object)))
+pca_poly <- prcomp(cyto_mat_pca, scale. = TRUE)
+
+pca_df1 <- as.data.frame(pca_poly$x) %>%
+  bind_cols(
+    pca_data %>%
+      select(`Subject ID`, Smoking, Age, RaceEth, Gender, UrinePoly, PolyGroup)
+  )
+
+# PERMANOVA p-value
+dist_cyto <- vegdist(cyto_mat_pca, method = "euclidean")
+adonis_res <- adonis2(dist_cyto ~ PolyGroup, data = pca_data)
+adonis_p <- signif(adonis_res$`Pr(>F)`[1], 2)
+
+ggplot(pca_df1, aes(x = PC1, y = PC2, color = PolyGroup)) +
+  geom_point(size = 3, alpha = 0.9) +
+  stat_chull(
+    aes(fill = PolyGroup),
+    geom = "polygon",
+    alpha = 0.18,
+    color = NA
+  ) +
+  annotate(
+    "text",
+    x = Inf, y = Inf,
+    hjust = 1.1, vjust = 1.5,
+    label = paste0("p = ", adonis_p),
+    size = 4
+  ) +
+  theme_bw(base_size = 12) +
+  labs(
+    x = "PC1", y = "PC2",
+    color = "Urine polyphenols",
+    fill  = "Urine polyphenols"
+  ) +
+  scale_color_manual(values = c("High" = "red", "Low" = "purple3")) +
+  scale_fill_manual(values = c("High" = "red", "Low" = "purple3"))
+
+ggsave("../figures/urine_polyphenols_hull_PCA_plot.svg", width = 6, height = 4)
+```
+
+

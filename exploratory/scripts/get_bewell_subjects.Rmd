@@ -1,0 +1,104 @@
+---
+title: "mimic participant options"
+author: "Caroline Wheeler"
+date: "10/22/2021"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+
+library(tidyverse)
+library(readxl)
+
+source("00-paths.R")
+```
+
+read in and transform randomization data
+```{r}
+juice <- read.csv(file.path(paths$box, "participants/P426HONC60BeWell_DATA_LABELS_2021-10-20_1538.csv")) %>%
+  select(Subject.Number, Randomized.to.receive.683.at) %>%
+  na_if("") %>%
+  drop_na() %>%
+  rename("placebo" = Randomized.to.receive.683.at)
+```
+
+read in and transform subject data for stool sample completeness
+```{r}
+subs <- read_excel(file.path(paths$box, "participants/bewell_studyschedule-v1.xlsx"), sheet = 4) %>%
+  select(c(1:17)) %>%
+  na_if("m")
+
+subs$Subject.Number <-as.integer(substr(subs$`Subject ID`, 8, 10))
+```
+merge
+```{r}
+juice <- merge(juice, subs)
+```
+
+<!-- remove samples missing more than 1 stool tub -->
+<!-- ```{r} -->
+<!-- cnt_na <- apply(juice, 1, function(z) sum(is.na(z))) -->
+
+<!-- juice <- juice[cnt_na < 2,] -->
+<!-- ``` -->
+
+```{r}
+juice <- juice %>%
+  select(`Subject ID`, Subject.Number, placebo) %>%
+  mutate(rB = ifelse(placebo == "Week 0", paste0(juice$`Subject ID`,"-v3"), paste0(juice$`Subject ID`,"-v1"))) %>%
+  mutate(tB = ifelse(placebo == "Week 0", paste0(juice$`Subject ID`,"-v4"), paste0(juice$`Subject ID`,"-v2"))) %>%
+  mutate(rP = ifelse(placebo == "Week 0", paste0(juice$`Subject ID`,"-v1"), paste0(juice$`Subject ID`,"-v3"))) %>%
+  mutate(tP = ifelse(placebo == "Week 0", paste0(juice$`Subject ID`,"-v2"), paste0(juice$`Subject ID`,"-v4")))
+  
+```
+
+read in barcodes
+```{r}
+extra <- readxl::read_xlsx(file.path(paths$box, "data/onecodex/2021_09-14_bewell_OneCodex_Sample-Registration.xlsx")) %>%
+  select(`Barcode ID`, Name)
+barcodes <- readxl::read_xlsx(file.path(paths$box, "data/onecodex/One Codex Sample Registration-v2.xlsx")) %>%
+  select(`Barcode ID`, Name)
+
+barcodes <- rbind(extra, barcodes)
+bars <- barcodes$Name
+```
+
+replace sample names with .1 version and NA where necessary
+HONC60-07-v3.1, HONC60-05-v3.1, HONC60-21-v1.1
+```{r}
+juice <- juice %>%
+  mutate(rB = ifelse(rB %in% bars, rB, NA),
+         tB = ifelse(tB %in% bars, tB, NA),
+         rP = ifelse(rP %in% bars, rP, NA),
+         tP = ifelse(tP %in% bars, tP, NA))
+
+#juice[3, 6] <- "HONC60-05-v3.1" # This sample is faulty - shouldn't be included
+juice[4, 6] <- "HONC60-07-v3.1"
+juice[7, 4] <- "HONC60-21-v1.1"
+#juice[1, 4] <- "HONC60-21-v1.1"
+```
+
+save CSV
+```{r}
+write_csv(juice, file.path(paths$box, "potential_mimic_subjects.csv"))
+```
+
+save CSV with all subjects
+```{r}
+write_csv(juice, file.path(paths$box, "bewell_subjects.csv"))
+```
+
+```{r}
+newdf <- juice %>% select(Subject.Number, rB, tB, rP, tP)
+newdf = gather(newdf, Subject.Number) %>%
+  mutate(timepoint =substr(str_remove(value, "v"), 8, length(value)))
+
+newdf <- newdf[complete.cases(newdf), ]
+```
+
+```{r}
+write_csv(newdf, file.path("../data/derived/bewell_barcodes.csv"))
+```
+
+

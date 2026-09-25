@@ -1,0 +1,224 @@
+---
+title: "FFQ_baseline_microbiome"
+author: "Bailey Conrad"
+date: "`r Sys.Date()`"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+
+library(tidyverse)
+library(ggplot2)
+library(glmm)
+library(broom)
+library(rlist)
+library(ggrepel)
+library(ggtext)
+```
+
+```{r}
+king <- read.csv("../../data/derived/RelAbun/RelAbun_king.csv")
+phyl <- read.csv("../../data/derived/RelAbun/RelAbun_phyl.csv")
+class <- read.csv("../../data/derived/RelAbun/RelAbun_class.csv")
+ord <- read.csv("../../data/derived/RelAbun/RelAbun_ord.csv")
+fam <- read.csv("../../data/derived/RelAbun/RelAbun_fam.csv")
+gen <- read.csv("../../data/derived/RelAbun/RelAbun_gen.csv")
+spec <- read.csv("../../data/derived/RelAbun/RelAbun_spec.csv")
+FFQ <- readRDS("../../data/derived/clinical_manuscript.rds")$diet
+samplabs <- readRDS("../../data/derived/clinical_manuscript.rds")$samples
+```
+
+#Mutate data frame to 3 FFQ scores
+```{r}
+FFQ.clean <- FFQ %>%
+  select(Username, resinversedih, resinversedip, RES_HEI2015)
+
+names(FFQ.clean)[names(FFQ.clean) == 'Username'] <- 'Subject.ID'
+```
+
+#Wanting to see correlation between 3 FFQ scores
+```{r}
+FFQ_corr <- cor(FFQ.clean[, c('resinversedih', 'resinversedip', 'RES_HEI2015')])
+
+FFQ_corr
+#inverse EDIP: Empirical Dietary Inflammatory Pattern, inverted scores adjusted for total energy uptake, higher scores indicate anti-inflammatory
+#EDIH: Empirical Dietary Index for Hyperinsulinemia, inverted scores adjusted for total energy uptake, higher scores indicating lower insulinemic diets
+#HEI: healthy eating index, adjusted for total energy uptake, higher score means better diet quality 
+```
+
+#Filtering to just visit 1 and merging with FFQ
+```{r}
+samplab.form <- samplabs %>%
+  pivot_longer(names_to = "Timepoint", values_to = "timepoints", cols = c("rP", "tP", "rB", "tB")) %>%
+  mutate(Sample = paste0(Subject.Number, "-", Timepoint)) 
+
+
+samplab.v1 <- read.csv("/Users/baileyconrad/Desktop/samplab.form.csv") %>%
+  select(Sample, Subject.ID)
+
+write.csv(samplab.v1, "../../data/derived/samplab.form.v1.csv")
+
+samplab.FFQ <- merge(samplab.v1,FFQ.clean,by="Subject.ID") %>%
+  select(-Subject.ID) 
+```
+
+#Combining Taxa data
+```{r}
+all_tax_levs_list <- list(king, phyl, class, ord, fam, gen, spec)
+
+all_tax_levs <- all_tax_levs_list %>% reduce(full_join, by='X')
+names(all_tax_levs)[names(all_tax_levs) == 'X'] <- 'Sample'
+
+all_tax_levs_long <- all_tax_levs %>%
+  pivot_longer(names_to = "Microbe", values_to = "avg.res", cols = 2:535)
+```
+
+#EDIP
+
+#Combining FFQ and Taxa data
+```{r}
+atl_edip <- merge(samplab.FFQ,all_tax_levs,by="Sample") %>%
+  select(-resinversedih) %>%
+  select(-RES_HEI2015)
+
+object <- unique(all_tax_levs_long$Microbe)
+```
+
+#Gaussian generalized linear model
+```{r}
+capture.models.univ.edip <- function(outcome, lfun, mics, modin) {
+  mods.list <- lapply(mics, function(x)  try({glm(as.formula(paste0(outcome, " ~ ", x)), family = lfun, data = modin) %>% tidy()}))
+  
+mods.list.clean <- list.clean(mods.list, function(x) is.null(x))
+mods.df <- bind_rows(mods.list.clean)
+return(mods.df)
+}
+```
+
+```{r warning = FALSE}
+edip<-capture.models.univ.edip(outcome = "resinversedip", lfun = "gaussian", mics = object, modin = atl_edip) %>%
+  filter(p.value<1.0) %>%
+  filter(term !="(Intercept)") %>%
+  separate(term, into = c("TaxaLevel", "term"), sep = "__") %>%
+  mutate(term = gsub("_", " ", term)) %>%
+  mutate(pointlabs_edip = ifelse(p.value <= 0.05, term, NA)) %>%
+ggplot(aes(x = estimate, y = -log(p.value), label = pointlabs_edip, color = TaxaLevel)) +
+  geom_point() +
+  theme_bw() +
+  labs(x = "Estimate", y = "-log(p-value)") +
+  geom_label_repel(show.legend = F) +
+  scale_color_discrete(name = "Taxonomic Level", breaks = c("k", "p", "c", "o", "f", "g", "s"), labels = c("Kingdom", "Phylum", "Class", "Order", "Family", "Genus", "Species")) +
+  ggtitle("EDIP")
+
+
+  # separate(term, into = c("TaxaLevel", "term"), sep = "__") %>%
+  # mutate(term = gsub("_", " ", term), 
+  #        term = paste0("<i>", term, "</i>"),
+  #        term = fct_reorder(term, estimate)) %>%
+
+  # geom_hline(yintercept = 2.0)+
+  # scale_x_log10() +
+  # ylim(0, 5) 
+edip
+
+ggsave("../figures/FFQ_microbiome_edip.png")
+```
+
+#EDIH
+
+#Combining FFQ and Taxa data
+```{r}
+atl_edih <- merge(samplab.FFQ,all_tax_levs,by="Sample") %>%
+  select(-resinversedip) %>%
+  select(-RES_HEI2015)
+```
+
+#Gaussian generalized linear model
+```{r}
+capture.models.univ.edih <- function(outcome, lfun, mics, modin) {
+  mods.list <- lapply(mics, function(x)  try({glm(as.formula(paste0(outcome, " ~ ", x)), family = lfun, data = modin) %>% tidy()}))
+  
+mods.list.clean <- list.clean(mods.list, function(x) is.null(x))
+mods.df <- bind_rows(mods.list.clean)
+return(mods.df)
+}
+```
+
+```{r warning = FALSE}
+edih<-capture.models.univ.edih(outcome = "resinversedih", lfun = "gaussian", mics = object, modin = atl_edih) %>%
+  filter(p.value<1.0) %>%
+  filter(term !="(Intercept)") %>%
+  separate(term, into = c("TaxaLevel", "term"), sep = "__") %>%
+  mutate(term = gsub("_", " ", term)) %>%
+  mutate(pointlabs_edih = ifelse(p.value <= 0.05, term, NA)) %>%
+ggplot(aes(x = estimate, y = -log(p.value), label = pointlabs_edih, color = TaxaLevel)) +
+  geom_point() +
+  theme_bw() +
+  labs(x = "Estimate", y = "-log(p-value)") +
+  geom_label_repel(show.legend = F) +
+  scale_color_discrete(name = "Taxonomic Level", breaks = c("k", "p", "c", "o", "f", "g", "s"), labels = c("Kingdom", "Phylum", "Class", "Order", "Family", "Genus", "Species"))+
+  ggtitle("EDIH")
+
+edih
+ggsave("../figures/FFQ_microbiome_edih.png")
+```
+
+#HEI
+
+#Combining FFQ and Taxa data
+```{r}
+atl_HEI <- merge(samplab.FFQ,all_tax_levs,by="Sample") %>%
+  select(-resinversedih) %>%
+  select(-resinversedip)
+```
+
+#Gaussian generalized linear model
+```{r}
+capture.models.univ.hei <- function(outcome, lfun, mics, modin) {
+  mods.list <- lapply(mics, function(x)  try({glm(as.formula(paste0(outcome, " ~ ", x)), family = lfun, data = modin) %>% tidy()}))
+  
+mods.list.clean <- list.clean(mods.list, function(x) is.null(x))
+mods.df <- bind_rows(mods.list.clean)
+return(mods.df)
+}
+```
+
+```{r warning = FALSE}
+hei<-capture.models.univ.hei(outcome = "RES_HEI2015", lfun = "gaussian", mics = object, modin = atl_HEI) %>%
+  filter(p.value<1.0) %>%
+  filter(term !="(Intercept)") %>%
+  separate(term, into = c("TaxaLevel", "term"), sep = "__") %>%
+  mutate(term = gsub("_", " ", term)) %>%
+  mutate(pointlabs = ifelse(p.value <= 0.05, term, NA)) %>%
+ggplot(aes(x = estimate, y = -log(p.value), label = pointlabs, color = TaxaLevel)) +
+  geom_point() +
+  theme_bw() +
+  labs(x = "Estimate", y = "-log(p-value)") +
+  geom_label_repel(show.legend = F) +
+  scale_color_discrete(name = "Taxonomic Level", breaks = c("k", "p", "c", "o", "f", "g", "s"), labels = c("Kingdom", "Phylum", "Class", "Order", "Family", "Genus", "Species")) +
+  ggtitle("HEI")
+
+hei
+ggsave("../figures/FFQ_microbiome_hei.png")
+```
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

@@ -1,0 +1,237 @@
+---
+title: "cytokines"
+author: "Rebecca Hoyd"
+date: "2/25/2022"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+
+library(tidyverse)
+library(ggrepel)
+# source("00-paths.R")
+```
+
+# Load data
+
+```{r}
+cytofile.1<- "../../data/raw/cytokines/13-2_20211209_173456.csv"
+cytofile.2 <- "../../data/raw/cytokines/New Batch 3_20211207_210206.csv"
+cytofile.3 <- "../../data/raw/cytokines/Spakowicz CRP_20220329_170324.csv"
+cytofile.4 <- "../../data/raw/cytokines/Spakowicz_12_20211221_191508.csv"
+
+il17f_data <- read_excel("../../data/raw/cytokines/IL17F ELISA result (PI_Spakowicz).xlsx", skip = 23) %>%
+  select(`Spakowicz Plasma Sample ID`, `Conc. (pg/ml)*fold dilution`) %>%
+  rename(
+    Sample = `Spakowicz Plasma Sample ID`,
+    avg.res = `Conc. (pg/ml)*fold dilution`
+  ) %>%
+  mutate(Sample = gsub("Spakowicz Plasma Sample PT: ", "", Sample),
+         Sample = gsub("\\.1$", "", Sample)) %>%
+  mutate(cytokine = "IL.17F") %>%
+  select(Sample, cytokine, avg.res)
+
+
+
+```
+
+```{r}
+cv.tab1 <- read.csv(cytofile.1, skip = 699)[1:47,]
+cv.tab2 <- read.csv(cytofile.2, skip = 699)[1:47,]
+cv.tab3 <- read.csv(cytofile.3, skip = 699)[1:47,]
+cv.tab4 <- read.csv(cytofile.4, skip = 704)[1:47,1:13]
+
+res.tab1 <- read.csv(cytofile.1, skip = 351)[1:96,]
+res.tab2 <- read.csv(cytofile.2, skip = 351)[1:96,]
+res.tab3 <- read.csv(cytofile.3, skip = 351)[1:96,]
+res.tab4 <- read.csv(cytofile.4, skip = 356)[1:96, 1:14]
+```
+
+# Quick plots
+
+```{r}
+cv.box1 <- cv.tab1 %>%
+  gather(-Sample, key = "cytokine", value = "CVpercent") %>%
+  mutate(CVpercent = as.numeric(CVpercent))
+
+cv.box1 %>%
+  ggplot(aes(x = CVpercent)) +
+  facet_wrap(vars(cytokine), scales = "free") +
+  geom_histogram() +
+  labs(x = "", y = "") +
+  theme_bw()
+ggsave("../../exploratory/figures/histogram_cv-percent_batch1.png")
+
+cv.tab2 %>%
+  gather(-Sample, key = "cytokine", value = "CVpercent") %>%
+  mutate(CVpercent = as.numeric(CVpercent)) %>%
+  ggplot(aes(x = CVpercent)) +
+  facet_wrap(vars(cytokine), scales = "free") +
+  geom_histogram() +
+  labs(x = "", y = "") +
+  theme_bw()
+ggsave("../../exploratory/figures/histogram_cv-percent_batch2.png")
+```
+
+```{r}
+res.tab1.box <-  res.tab1%>%
+  filter(!grepl("Standard", Sample)) %>%
+  gather(-Sample, -Location, -Total.Events, key = "cytokine", value = "result") %>%
+  # filter(cytokine != "Cystatin.C") %>%
+  mutate(result = as.numeric(result)) %>%
+  group_by(cytokine) %>%
+  mutate(iqr = IQR(result, na.rm = T),
+         is.outlier = (result > quantile(result,.75,na.rm = T ) + 1.5*iqr)|(result < quantile(result,.25,na.rm = T ) - 1.5*iqr)) %>%
+  ungroup() %>%
+  mutate(slab = ifelse(is.outlier == T, Sample, NA))
+
+res.tab1.box %>%
+  mutate(compcom = ifelse(grepl("Complement", cytokine), T,F)) %>%
+  ggplot(aes(x = cytokine, y = result, label = slab)) +
+  # facet_wrap(~cytokine, scales = "free") +
+  geom_boxplot() +
+  geom_text_repel() +
+  labs(x = "", y = "") +
+  theme_bw() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+ggsave("../../exploratory/figures/boxplot_cytokine-results.png")
+
+```
+
+# IQR outliers
+
+```{r catch up second batch}
+res.tab2.box <-  res.tab2%>%
+  filter(!grepl("Standard", Sample)) %>%
+  gather(-Sample, -Location, -Total.Events, key = "cytokine", value = "result") %>%
+  # filter(cytokine != "Cystatin.C") %>%
+  mutate(result = as.numeric(gsub("> ", "", result))) %>%
+  group_by(cytokine) %>%
+  mutate(iqr = IQR(result, na.rm = T),
+         is.outlier = (result > quantile(result,.75,na.rm = T ) + 1.5*iqr)|(result < quantile(result,.25,na.rm = T ) - 1.5*iqr)) %>%
+  ungroup() %>%
+  mutate(slab = ifelse(is.outlier == T, Sample, NA))
+
+res.tab3.box <-  res.tab3%>%
+  filter(!grepl("Standard", Sample)) %>%
+  gather(-Sample, -Location, -Total.Events, key = "cytokine", value = "result") %>%
+  # filter(cytokine != "Cystatin.C") %>%
+  mutate(result = as.numeric(gsub("> ", "",result))) %>%
+  group_by(cytokine) %>%
+  mutate(iqr = IQR(result, na.rm = T),
+         is.outlier = (result > quantile(result,.75,na.rm = T ) + 1.5*iqr)|(result < quantile(result,.25,na.rm = T ) - 1.5*iqr)) %>%
+  ungroup() %>%
+  mutate(slab = ifelse(is.outlier == T, Sample, NA))
+
+res.tab4.box <- res.tab4 %>% 
+  filter(!grepl("Standard", Sample)) %>%
+  gather(-Sample, -Location, key = "cytokine", value = "result") %>%
+  # filter(cytokine != "Cystatin.C") %>%
+  mutate(result = as.numeric(gsub("> ", "",gsub("< ", "", result)))) %>%
+  group_by(cytokine) %>%
+  mutate(iqr = IQR(result, na.rm = T),
+         is.outlier = (result > quantile(result,.75,na.rm = T ) + 1.5*iqr)|(result < quantile(result,.25,na.rm = T ) - 1.5*iqr)) %>%
+  ungroup() %>%
+  mutate(slab = ifelse(is.outlier == T, Sample, NA))
+```
+
+```{r define cv outliers}
+cv.out1 <- cv.box1 %>%
+  group_by(cytokine) %>%
+  mutate(CV.iqr = IQR(CVpercent, na.rm = T)) %>%
+  ungroup() %>%
+  mutate(CV.outlier =  (CVpercent > quantile(CVpercent,.75,na.rm = T ) + 1.5*CV.iqr)) %>%
+  select(Sample, cytokine, CV.outlier)
+
+cv.out2 <- cv.tab2 %>%
+  gather(-Sample, key = "cytokine", value = "CVpercent") %>%
+  mutate(CVpercent = as.numeric(CVpercent)) %>%
+  group_by(cytokine) %>%
+  mutate(CV.iqr = IQR(CVpercent, na.rm = T)) %>%
+  ungroup() %>%
+  mutate(CV.outlier =  (CVpercent > quantile(CVpercent,.75,na.rm = T ) + 1.5*CV.iqr)) %>%
+  select(Sample, cytokine, CV.outlier)
+
+cv.out3 <- cv.tab3 %>%
+  gather(-Sample, key = "cytokine", value = "CVpercent") %>%
+  mutate(CVpercent = as.numeric(CVpercent)) %>%
+  group_by(cytokine) %>%
+  mutate(CV.iqr = IQR(CVpercent, na.rm = T)) %>%
+  ungroup() %>%
+  mutate(CV.outlier =  (CVpercent > quantile(CVpercent,.75,na.rm = T ) + 1.5*CV.iqr)) %>%
+  select(Sample, cytokine, CV.outlier)
+
+cv.out4 <- cv.tab4 %>%
+  gather(-Sample, key = "cytokine", value = "CVpercent") %>%
+  mutate(CVpercent = as.numeric(CVpercent)) %>%
+  group_by(cytokine) %>%
+  mutate(CV.iqr = IQR(CVpercent, na.rm = T)) %>%
+  ungroup() %>%
+  mutate(CV.outlier =  (CVpercent > quantile(CVpercent,.75,na.rm = T ) + 1.5*CV.iqr)) %>%
+  select(Sample, cytokine, CV.outlier)
+```
+
+```{r table of outlier conditions}
+res.out.b1 <- res.tab1.box %>%
+  select(Sample, Location, cytokine, is.outlier) %>%
+  left_join(cv.out1) %>%
+  mutate(combined.outlier = is.outlier == T & CV.outlier == T) %>%
+  filter(combined.outlier == T)
+
+res.out.b2 <- res.tab2.box %>%
+  select(Sample, Location, cytokine, is.outlier) %>%
+  left_join(cv.out2) %>%
+  mutate(combined.outlier = is.outlier == T & CV.outlier == T) %>%
+  filter(combined.outlier == T)
+
+res.out.b3 <- res.tab3.box %>%
+  select(Sample, Location, cytokine, is.outlier) %>%
+  left_join(cv.out3) %>%
+  mutate(combined.outlier = is.outlier == T & CV.outlier == T) %>%
+  filter(combined.outlier == T)
+
+res.out.b4 <- res.tab4.box %>%
+  select(Sample, Location, cytokine, is.outlier) %>%
+  left_join(cv.out4) %>%
+  mutate(combined.outlier = is.outlier == T & CV.outlier == T) %>%
+  filter(combined.outlier == T)
+```
+
+# Remove outliers and get final values
+
+```{r}
+res.good.1 <- res.tab1.box %>%
+  anti_join(res.out.b1) %>%
+  filter(!grepl("Background", Sample)) %>%
+  group_by(Sample, cytokine) %>%
+  summarize(avg.res = mean(result, na.rm = T))
+
+res.good.2 <- res.tab2.box %>%
+  anti_join(res.out.b2) %>%
+  filter(!grepl("Background", Sample)) %>%
+  group_by(Sample, cytokine) %>%
+  summarize(avg.res = mean(result, na.rm = T))
+
+res.good.3 <- res.tab3.box %>%
+  anti_join(res.out.b3) %>%
+  filter(!grepl("Background", Sample)) %>%
+  group_by(Sample, cytokine) %>%
+  summarize(avg.res = mean(result, na.rm = T))
+
+res.good.4 <- res.tab4.box %>%
+  anti_join(res.out.b4) %>%
+  filter(!grepl("Background", Sample)) %>%
+  group_by(Sample, cytokine) %>%
+  summarize(avg.res = mean(result, na.rm = T)) %>%
+  mutate(cytokine = gsub("Comlement", "Complement", cytokine),
+         avg.res = ifelse(is.nan(avg.res), 0, avg.res))
+
+# Combine standard cytokine results with IL17F ELISA results
+avg.results.tab <- bind_rows(res.good.1, res.good.2, res.good.3, res.good.4, il17f_data) %>%
+  arrange(Sample, cytokine)
+```
+
+```{r}
+write.csv(avg.results.tab, "../../data/derived/cytokines_avg-results.csv")
+```
