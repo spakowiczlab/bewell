@@ -14,6 +14,8 @@
 </tr>
 </table>
 
+Archived release (v1.0.0): [10.5281/zenodo.22950619](https://doi.org/10.5281/zenodo.22950619)
+
 The clinical trial protocol is [`2019C0089_Protocol.pdf`](2019C0089_Protocol.pdf).
 
 ## Citation
