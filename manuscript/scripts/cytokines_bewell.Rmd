@@ -8,6 +8,8 @@ output: html_document
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
 
+library(broom.mixed)
+library(purrr)
 library(tidyverse)
 library(glmm)
 library(broom)
@@ -17,10 +19,10 @@ library(ggtext)
 library(ggplot2)
 library(ggpubr)
 library(lme4)
-library(broom.mixed)
 library(dplyr)
 library(readr)
 library(vegan)
+library(pheatmap)
 ```
 
 
@@ -498,6 +500,19 @@ cyto_full_poly <- cyto_full %>%
 ```
 
 ```{r}
+## urine-polyphenol-pca-loadings
+
+urine_polyphenol_loadings <- as.data.frame(met_pca$rotation) %>%
+  tibble::rownames_to_column("metabolite") %>%
+  arrange(desc(abs(PC1)))
+
+top_urine_polyphenols <- urine_polyphenol_loadings %>%
+  slice_head(n = 10)
+
+top_urine_polyphenols
+```
+
+```{r}
 ##cca-with-urinepoly-multivariate
 # Keep rows with complete cytokines and all covariates (including UrinePoly)
 cca_data_all <- cyto_full_poly %>%
@@ -569,6 +584,21 @@ urine_polyphenol_df_all <- data.frame(
 cyto_full_poly_all <- cyto_full %>%
   left_join(urine_polyphenol_df_all,
             by = c("Subject ID" = "Subject.Number"))
+```
+
+
+```{r}
+## urinary-polyphenol-pc1-loadings
+
+urine_polyphenol_loadings <- as.data.frame(met_pca$rotation) %>%
+  rownames_to_column("metabolite") %>%
+  arrange(desc(abs(PC1)))
+
+top_urine_polyphenol_loadings <- urine_polyphenol_loadings %>%
+  slice_head(n = 5)
+
+urine_polyphenol_loadings
+top_urine_polyphenol_loadings
 ```
 
 ```{r}
@@ -686,6 +716,25 @@ ggplot(pca_df1, aes(x = PC1, y = PC2, color = PolyGroup)) +
 
 ggsave("../../exploratory/figures/sig_urine_polyphenols_hull_PCA_plot.svg", width = 6, height = 4)
 ```
+```{r}
+## cytokine-pca-loadings
+
+cytokine_pca_loadings <- as.data.frame(pca_poly$rotation) %>%
+  rownames_to_column("cytokine")
+
+top_cytokine_PC1_loadings <- cytokine_pca_loadings %>%
+  arrange(desc(abs(PC1))) %>%
+  slice_head(n = 5)
+
+top_cytokine_PC2_loadings <- cytokine_pca_loadings %>%
+  arrange(desc(abs(PC2))) %>%
+  slice_head(n = 5)
+
+top_cytokine_PC1_loadings
+top_cytokine_PC2_loadings
+```
+
+
 #all
 ```{r}
 ## pca-by-urinepoly-groups-all

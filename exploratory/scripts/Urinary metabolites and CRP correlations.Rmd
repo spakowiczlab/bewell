@@ -1,0 +1,502 @@
+---
+title: "Urinary metabolites and CRP correlations"
+author: "Shiva Jahanbakhshi"
+date: "2026-07-29"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+
+library(tidyverse)
+library(readxl)
+library(ggrepel)
+```
+
+# Prepare urinary metabolite data
+```{r}
+# Read timepoint key
+key_long <- read.csv(
+  "../data/derived/timepoint_key_long.csv"
+)
+
+# Read urinary metabolite concentrations
+met_raw <- read_excel(
+  "../data/raw/urine-metabolomics/Dan Urine Anthocyanin 11-10-2022.xlsx",
+  sheet = "concentration ng mL"
+)
+
+# Convert metabolite table from wide to long format
+met <- met_raw %>%
+  rename(metabolite = 1) %>%
+  pivot_longer(
+    cols = matches("^\\d+-V\\d+$"),
+    names_to = "Sample",
+    values_to = "value",
+    values_transform = list(value = as.character)
+  ) %>%
+  mutate(
+    value = readr::parse_number(value)
+  ) %>%
+  separate(
+    Sample,
+    into = c("Subject.Number", "v"),
+    sep = "-",
+    remove = FALSE
+  ) %>%
+  mutate(
+    Subject.Number = as.character(Subject.Number),
+    v = toupper(v)
+  )
+
+sum(is.na(met$value))
+table(met$v)
+head(met)
+```
+
+#Add metabolite timepoint labels
+```{r}
+key_long_clean <- key_long %>%
+  mutate(
+    Subject.Number = as.character(Subject.Number),
+    v = toupper(substr(timepoints, 11, 12)),
+    v = if_else(
+      v == "-V",
+      toupper(substr(timepoints, 12, 13)),
+      v
+    )
+  ) %>%
+  select(
+    Subject.Number,
+    v,
+    Timepoint
+  ) %>%
+  distinct()
+
+met <- met %>%
+  left_join(
+    key_long_clean,
+    by = c("Subject.Number", "v")
+  )
+
+# Check timepoint matching
+table(met$Timepoint, useNA = "ifany")
+```
+#Create pre-BRB, post-BRB and metabolite-change table
+```{r}
+met_brb <- met %>%
+  filter(Timepoint %in% c("rB", "tB")) %>%
+  filter(!is.na(value)) %>%
+  group_by(
+    Subject.Number,
+    metabolite,
+    Timepoint
+  ) %>%
+  summarise(
+    value = mean(value, na.rm = TRUE),
+    .groups = "drop"
+  ) %>%
+  pivot_wider(
+    names_from = Timepoint,
+    values_from = value
+  ) %>%
+  mutate(
+    metabolite_change = tB - rB
+  )
+
+head(met_brb)
+```
+#Prepare CRP data
+```{r}
+cytokines <- read.csv(
+  "../data/derived/cytokines_avg-results.csv"
+)
+
+sample_key <- read.csv(
+  "../data/derived/timepoint_key.csv"
+)
+```
+
+#Assign cytokine samples to study timepoints
+```{r}
+sample_labels <- sample_key %>%
+  select(
+    Subject.Number,
+    placebo
+  ) %>%
+  mutate(
+    Subject.Number = as.character(Subject.Number),
+
+    preP = if_else(
+      placebo == "Week 0",
+      1,
+      3
+    ),
+
+    postP = if_else(
+      placebo == "Week 0",
+      2,
+      4
+    ),
+
+    preBRB = if_else(
+      placebo == "Week 0",
+      3,
+      1
+    ),
+
+    postBRB = if_else(
+      placebo == "Week 0",
+      4,
+      2
+    )
+  ) %>%
+  pivot_longer(
+    cols = c(
+      preP,
+      postP,
+      preBRB,
+      postBRB
+    ),
+    names_to = "timepoint.label",
+    values_to = "visit"
+  ) %>%
+  mutate(
+    Sample = paste0(
+      Subject.Number,
+      "-",
+      visit
+    )
+  ) %>%
+  select(
+    Sample,
+    Subject.Number,
+    timepoint.label
+  )
+```
+
+#Extract CRP values
+
+```{r}
+crp <- cytokines %>%
+  mutate(
+    Sample = as.character(Sample),
+    Sample = gsub("^0", "", Sample),
+    Sample = gsub("\\.1$", "", Sample)
+  ) %>%
+  filter(
+    cytokine == "C.Reactive.Protein.CRP"
+  ) %>%
+  left_join(
+    sample_labels,
+    by = "Sample"
+  ) %>%
+  filter(
+    timepoint.label %in% c(
+      "preBRB",
+      "postBRB"
+    )
+  ) %>%
+  mutate(
+    Subject.Number = as.character(Subject.Number),
+    CRP = as.numeric(avg.res)
+  ) %>%
+  group_by(
+    Subject.Number,
+    timepoint.label
+  ) %>%
+  summarise(
+    CRP = mean(CRP, na.rm = TRUE),
+    .groups = "drop"
+  ) %>%
+  pivot_wider(
+    names_from = timepoint.label,
+    values_from = CRP,
+    names_prefix = "CRP_"
+  ) %>%
+  mutate(
+    CRP_change = CRP_postBRB - CRP_preBRB
+  )
+
+head(crp)
+```
+#Combine metabolites with CRP
+```{r}
+met_crp <- met_brb %>%
+  inner_join(
+    crp,
+    by = "Subject.Number"
+  )
+
+# Number of matched participants
+n_distinct(met_crp$Subject.Number)
+
+# Check CRP distributions
+summary(met_crp$CRP_preBRB)
+summary(met_crp$CRP_postBRB)
+summary(met_crp$CRP_change)
+```
+#Function for Spearman correlations
+```{r}
+run_spearman <- function(
+    data,
+    metabolite_variable,
+    crp_variable,
+    analysis_name
+) {
+
+  data %>%
+    group_by(metabolite) %>%
+    group_modify(
+      ~ {
+        x <- .x[[metabolite_variable]]
+        y <- .x[[crp_variable]]
+
+        complete <- complete.cases(x, y)
+
+        x <- x[complete]
+        y <- y[complete]
+
+        n_complete <- length(x)
+
+        if (
+          n_complete < 5 ||
+          length(unique(x)) < 2 ||
+          length(unique(y)) < 2
+        ) {
+          return(
+            tibble(
+              n = n_complete,
+              rho = NA_real_,
+              p.value = NA_real_
+            )
+          )
+        }
+
+        test <- suppressWarnings(
+          cor.test(
+            x,
+            y,
+            method = "spearman",
+            exact = FALSE
+          )
+        )
+
+        tibble(
+          n = n_complete,
+          rho = unname(test$estimate),
+          p.value = test$p.value
+        )
+      }
+    ) %>%
+    ungroup() %>%
+    mutate(
+      p.adj = p.adjust(
+        p.value,
+        method = "BH"
+      ),
+      analysis = analysis_name,
+      significant_raw = p.value < 0.05,
+      significant_FDR = p.adj < 0.05
+    ) %>%
+    arrange(p.adj, p.value)
+}
+```
+
+#Baseline metabolite abundance vs baseline CRP
+```{r}
+cor_baseline <- run_spearman(
+  data = met_crp,
+  metabolite_variable = "rB",
+  crp_variable = "CRP_preBRB",
+  analysis_name = "Baseline metabolite vs baseline CRP"
+)
+
+cor_baseline
+```
+#Post-BRB metabolite abundance vs post-BRB CRP
+```{r}
+cor_post <- run_spearman(
+  data = met_crp,
+  metabolite_variable = "tB",
+  crp_variable = "CRP_postBRB",
+  analysis_name = "Post-BRB metabolite vs post-BRB CRP"
+)
+
+cor_post
+```
+#Metabolite change vs CRP change
+```{r}
+cor_change <- run_spearman(
+  data = met_crp,
+  metabolite_variable = "metabolite_change",
+  crp_variable = "CRP_change",
+  analysis_name = "Metabolite change vs CRP change"
+)
+
+cor_change
+```
+#Combine all results
+```{r}
+cor_results_all <- bind_rows(
+  cor_baseline,
+  cor_post,
+  cor_change
+)
+
+cor_results_all
+```
+#View nominally significant correlations
+```{r}
+cor_results_all %>%
+  filter(p.value < 0.05) %>%
+  arrange(analysis, p.value)
+```
+#View FDR-significant correlations
+```{r}
+cor_results_all %>%
+  filter(p.adj < 0.05) %>%
+  arrange(analysis, p.adj)
+```
+
+#Save results
+```{r}
+write_csv(
+  cor_results_all,
+  "../data/derived/urinary_metabolite_CRP_correlations.csv"
+)
+
+write_csv(
+  cor_results_all %>%
+    filter(p.value < 0.05),
+  "../data/derived/urinary_metabolite_CRP_nominally_significant.csv"
+)
+
+write_csv(
+  cor_results_all %>%
+    filter(p.adj < 0.05),
+  "../data/derived/urinary_metabolite_CRP_FDR_significant.csv"
+)
+```
+
+#Correlation results plot
+```{r}
+cor_plot <- cor_results_all %>%
+  filter(!is.na(rho), !is.na(p.value)) %>%
+  mutate(
+    label = if_else(
+      p.value < 0.05,
+      metabolite,
+      NA_character_
+    )
+  ) %>%
+  ggplot(
+    aes(
+      x = rho,
+      y = -log10(p.value),
+      label = label
+    )
+  ) +
+  geom_point(
+    aes(
+      shape = significant_FDR
+    ),
+    size = 2.5
+  ) +
+  geom_hline(
+    yintercept = -log10(0.05),
+    linetype = "dashed"
+  ) +
+  geom_label_repel(
+    max.overlaps = Inf,
+    size = 3
+  ) +
+  facet_wrap(
+    ~ analysis,
+    scales = "free"
+  ) +
+  labs(
+    x = "Spearman correlation coefficient (rho)",
+    y = "-log10(p-value)",
+    shape = "FDR significant"
+  ) +
+  theme_bw(base_size = 12)
+
+cor_plot
+```
+```{r}
+significant_change_metabolites <- cor_change %>%
+  filter(p.value < 0.05) %>%
+  pull(metabolite)
+
+if (length(significant_change_metabolites) > 0) {
+
+  individual_plot <- met_crp %>%
+    filter(
+      metabolite %in% significant_change_metabolites
+    ) %>%
+    ggplot(
+      aes(
+        x = metabolite_change,
+        y = CRP_change
+      )
+    ) +
+    geom_point(size = 2.5) +
+    geom_smooth(
+      method = "lm",
+      se = TRUE
+    ) +
+    facet_wrap(
+      ~ metabolite,
+      scales = "free_x"
+    ) +
+    labs(
+      x = "Change in urinary metabolite abundance (post − pre)",
+      y = "Change in CRP (post − pre)"
+    ) +
+    theme_bw(base_size = 12)
+
+  print(individual_plot)
+
+  ggsave(
+    "../figures/significant_metabolite_CRP_change_correlations.svg",
+    plot = individual_plot,
+    width = 8,
+    height = 5
+  )
+}
+```
+
+```{r}
+cor_post %>%
+  filter(p.adj < 0.05)
+```
+
+```{r}
+cor_change %>%
+  filter(p.adj < 0.05)
+```
+```{r}
+length(unique(met$metabolite))
+length(unique(met_brb$metabolite))
+```
+```{r}
+cor_post %>%
+  filter(str_detect(
+    metabolite,
+    regex("vanillic", ignore_case = TRUE)
+  ))
+```
+
+```{r}
+CRP_change ~ polyphenol_exposure + smoking
+```
+
+```{r}
+CRP_change ~ adherence_group + smoking
+```
+
+```{r}
+CRP_change ~ adherence_group * smoking
+```
+

@@ -1,0 +1,4 @@
+metabolite,n,rho,p.value,p.adj,analysis,significant_raw,significant_FDR
+vanillic acid,19,0.533044819882067,0.01877279650704269,0.13085125713974563,Baseline metabolite vs baseline CRP,TRUE,FALSE
+cy gluA,5,0.8999999999999998,0.03738607346849875,0.13085125713974563,Baseline metabolite vs baseline CRP,TRUE,FALSE
+vanillic acid,19,0.5289990594905932,0.01986627845970638,0.3178604553553021,Post-BRB metabolite vs post-BRB CRP,TRUE,FALSE

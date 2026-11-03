@@ -363,7 +363,7 @@ met <- met %>%
   rename("metabolite" = `...1`) %>%
   separate(Sample, c("Subject.Number", "v")) %>%
   mutate(v = toupper(v))
-
+ 
 # prep key
 key.long <- key.long %>%
   mutate(v =  toupper(substr(Timepoint, 11, 12)),
@@ -387,4 +387,268 @@ met <- met %>%
 metabolites of interest are:
 cy rut
 cy xy rut
+
+#adnosin
+#----------------260820
+```{r}
+key_adonis <- read.csv(
+  "../data/derived/timepoint_key.csv"
+)
+
+taxa_adonis <- read.csv(
+  "../data/derived/bewell_taxonomy_relAbun.csv"
+)
+
+ipaq_adonis <- read.csv(
+  "../data/derived/09-10-21_demographics.csv"
+)
+```
+
+```{r}
+ipaq_adonis <- ipaq_adonis %>%
+  mutate(
+    subject_number = as.character(subject_number),
+    metsTotal = METwalking + METmoderate + METvig + METmins,
+    Activity = if_else(
+      IPAQscore == "HEPA active" | metsTotal >= 5000,
+      "Active",
+      "Inactive"
+    ),
+    Subject.Number = subject_number
+  )
+```
+
+```{r}
+brb_sample_key <- key_adonis %>%
+  mutate(Subject.Number = as.character(Subject.Number)) %>%
+  filter(
+    !is.na(rB),
+    !is.na(tB)
+  ) %>%
+  select(Subject.Number, rB, tB) %>%
+  pivot_longer(
+    cols = c(rB, tB),
+    names_to = "Timepoint",
+    values_to = "id"
+  ) %>%
+  mutate(id = as.character(id))
+```
+
+
+
+```{r}
+taxa_brb <- taxa_adonis %>%
+  mutate(
+    id = as.character(id),
+    RelAbun = as.numeric(RelAbun)
+  ) %>%
+  inner_join(
+    brb_sample_key,
+    by = c("id", "variable" = "Timepoint")
+  )
+```
+
+```{r}
+table(taxa_brb$variable)
+length(unique(taxa_brb$Subject.Number))
+```
+
+```{r}
+length(common_subjects)
+
+table(adonis_meta$Activity)
+
+nrow(adonis_meta)
+
+identical(
+  rownames(post_mat_adonis),
+  adonis_meta$Subject.Number
+)
+
+adonis_activity
+adonis_adjusted
+permutest(activity_dispersion, permutations = 9999)
+```
+
+```{r}
+microbiome_wide <- taxa_brb %>%
+  group_by(Subject.Number.x, variable, Taxonomy) %>%
+  summarise(
+    RelAbun = sum(RelAbun, na.rm = TRUE),
+    .groups = "drop"
+  ) %>%
+  pivot_wider(
+    names_from = Taxonomy,
+    values_from = RelAbun,
+    values_fill = 0
+  )
+```
+
+```{r}
+pre_df <- microbiome_wide %>%
+  filter(variable == "rB") %>%
+  select(-variable) %>%
+  arrange(Subject.Number.x)
+
+pre_ids <- pre_df$Subject.Number.x
+
+pre_mat <- pre_df %>%
+  select(-Subject.Number.x) %>%
+  as.data.frame()
+
+rownames(pre_mat) <- pre_ids
+```
+
+```{r}
+post_df <- microbiome_wide %>%
+  filter(variable == "tB") %>%
+  select(-variable) %>%
+  arrange(Subject.Number.x)
+
+post_ids <- post_df$Subject.Number.x
+
+post_mat <- post_df %>%
+  select(-Subject.Number.x) %>%
+  as.data.frame()
+
+rownames(post_mat) <- post_ids
+```
+
+```{r}
+common_subjects <- intersect(
+  rownames(pre_mat),
+  rownames(post_mat)
+)
+
+pre_mat <- pre_mat[
+  common_subjects,
+  ,
+  drop = FALSE
+]
+
+post_mat <- post_mat[
+  common_subjects,
+  ,
+  drop = FALSE
+]
+```
+
+```{r}
+pre_mat <- pre_mat[, colSums(pre_mat) > 0, drop = FALSE]
+post_mat <- post_mat[, colSums(post_mat) > 0, drop = FALSE]
+```
+
+```{r}
+pre_bray <- vegdist(
+  pre_mat,
+  method = "bray"
+)
+
+pre_pcoa <- cmdscale(
+  pre_bray,
+  eig = TRUE,
+  k = 2,
+  add = TRUE
+)
+
+pre_pc <- data.frame(
+  Subject.Number = rownames(pre_pcoa$points),
+  Pre_PC1 = pre_pcoa$points[, 1],
+  Pre_PC2 = pre_pcoa$points[, 2],
+  row.names = NULL
+)
+```
+
+```{r}
+adonis_meta <- ipaq_adonis %>%
+  mutate(
+    Subject.Number = as.character(Subject.Number),
+    Activity = case_when(
+      str_to_lower(str_trim(Activity)) == "active" ~ "Active",
+      str_to_lower(str_trim(Activity)) == "inactive" ~ "Inactive",
+      TRUE ~ NA_character_
+    )
+  ) %>%
+  select(Subject.Number, Activity) %>%
+  distinct() %>%
+  inner_join(pre_pc, by = "Subject.Number") %>%
+  filter(
+    Subject.Number %in% rownames(post_mat),
+    !is.na(Activity),
+    !is.na(Pre_PC1)
+  )
+```
+
+```{r}
+adonis_meta <- adonis_meta %>%
+  arrange(match(Subject.Number, rownames(post_mat)))
+
+post_mat_adonis <- post_mat[
+  adonis_meta$Subject.Number,
+  ,
+  drop = FALSE
+]
+
+identical(
+  rownames(post_mat_adonis),
+  adonis_meta$Subject.Number
+)
+```
+
+```{r}
+table(adonis_meta$Activity)
+```
+
+```{r}
+post_bray <- vegdist(
+  post_mat_adonis,
+  method = "bray"
+)
+
+adonis_activity <- adonis2(
+  post_bray ~ Activity,
+  data = adonis_meta,
+  permutations = 9999
+)
+
+adonis_activity
+```
+```{r}
+adonis_adjusted <- adonis2(
+  post_bray ~ Pre_PC1 + Activity,
+  data = adonis_meta,
+  permutations = 9999,
+  by = "margin"
+)
+
+adonis_adjusted
+```
+
+```{r}
+activity_dispersion <- betadisper(
+  post_bray,
+  group = adonis_meta$Activity
+)
+
+permutest(
+  activity_dispersion,
+  permutations = 9999
+)
+```
+
+```{r}
+adonis_activity
+adonis_adjusted
+permutest(activity_dispersion, permutations = 9999)
+```
+
+```{r}
+length(common_subjects)
+nrow(adonis_meta)
+table(adonis_meta$Activity)
+
+adonis_activity
+adonis_adjusted
+```
+
 

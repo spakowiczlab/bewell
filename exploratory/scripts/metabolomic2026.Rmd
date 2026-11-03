@@ -14,6 +14,7 @@ library(pheatmap)
 library(grid)
 library(svglite)
 library(ggpubr)
+
 ```
 
 read in data
@@ -549,4 +550,85 @@ met %>%
 ggsave("../figures/metabolomics_3boxplot_brb.svg", height = 4, width = 6)
 ```
 
+260824
+```{r}
+# CRP dataframe should contain:
+# Subject.Number, CRP_pre, CRP_post
+
+met_crp <- rb_tb_wide_all %>%
+  mutate(Subject.Number = as.character(Subject.Number)) %>%
+  left_join(
+    crp_change %>%
+      mutate(Subject.Number = as.character(Subject.Number)),
+    by = "Subject.Number"
+  )
+
+met_crp_results <- met_crp %>%
+  group_by(metabolite) %>%
+  summarise(
+    n = sum(complete.cases(change, delta_CRP)),
+    rho = cor(
+      change,
+      delta_CRP,
+      method = "spearman",
+      use = "complete.obs"
+    ),
+    p.value = cor.test(
+      change,
+      delta_CRP,
+      method = "spearman",
+      exact = FALSE
+    )$p.value,
+    .groups = "drop"
+  ) %>%
+  mutate(
+    p.adj = p.adjust(p.value, method = "BH")
+  ) %>%
+  arrange(p.value)
+
+met_crp_results
+```
+
+```{r}
+met_crp_results <- met_crp %>%
+  group_by(metabolite) %>%
+  summarise(
+    n = sum(complete.cases(change, delta_CRP)),
+    rho = cor(
+      change,
+      delta_CRP,
+      method = "spearman",
+      use = "complete.obs"
+    ),
+    p.value = cor.test(
+      change,
+      delta_CRP,
+      method = "spearman",
+      exact = FALSE
+    )$p.value,
+    .groups = "drop"
+  ) %>%
+  mutate(
+    p.adj = p.adjust(p.value, method = "BH")
+  ) %>%
+  arrange(p.value)
+
+met_crp_results
+```
+
+```{r}
+top_metabolites <- c("peon rut", "peon sam", "cy xyrut")
+
+met_crp %>%
+  filter(metabolite %in% top_metabolites) %>%
+  ggplot(aes(x = change, y = delta_CRP)) +
+  geom_point(size = 2) +
+  geom_smooth(method = "lm", se = FALSE) +
+  facet_wrap(~ metabolite, scales = "free_x") +
+  labs(
+    x = "Change in urinary metabolite (Post-BRB - Pre-BRB)",
+    y = "Change in CRP (Post-BRB - Pre-BRB)"
+  ) +
+  theme_bw()
+```
 

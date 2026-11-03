@@ -1,5 +1,5 @@
 ---
-title: "Figure 4D and 4E"
+title: "Figure 4 C&D"
 author: "Shiva Jahanbakhshi"
 date: "2025-12-24"
 output: html_document
@@ -16,7 +16,7 @@ library(ggplot2)
 library(vegan)
 
 rel <- read_csv(
-  "../../data/derived/bewell_taxonomy_relAbun.csv",
+  "../data/derived/bewell_taxonomy_relAbun.csv",
   show_col_types = FALSE
 ) %>%
   mutate(
@@ -24,11 +24,16 @@ rel <- read_csv(
     RelAbun = as.numeric(RelAbun)
   )
 
-ipaq <- readRDS("../../data/derived/clinical_manuscript.rds")$subjects
+ipaq <- read.csv("../data/derived/09-10-21_demographics.csv")
+
+BEWELL_demographics <- read_csv("../data/derived/BEWELL demographics.csv")
+
+bewelldietscore_07122022 <- read_csv("../data/derived/bewelldietscore.07122022.csv")
+
 
 ```
 
-### Figure 4D: 6-taxa representative boxplots
+### 6-taxa representative boxplots
 ```{r}
 # Prep
 rel2 <- rel %>%
@@ -65,15 +70,15 @@ p_box <- ggplot(box_df, aes(x = variable, y = RelAbun, fill = variable)) +
   )
 
 p_box
-ggsave("../figures/fig4D.svg", p_box, height = 6, width = 14)
+ggsave("../figures/fig4_Representative_boxplots.svg", p_box, height = 8, width = 14)
 
 
 ```
 
-### Figure 4E: baseline PCA colored by BRB effect group
+### Baseline PCA colored by BRB effect group
 ```{r}
 # Load model results and define BRB-enriched taxa (unadjusted p < 0.05)
-load("../../data/model_stats_BW.rda")  # creates model_res_BW
+load("../data/model_stats_BW.rda")  # creates model_res_BW
 
 sig_taxa <- model_res_BW %>%
   filter(p.value < 0.05) %>%
@@ -152,32 +157,132 @@ p_pca <- ggplot(scores, aes(PC1, PC2, color = brb_status)) +
   labs(color = "BRB effect group", fill = "BRB effect group")
 
 p_pca
-ggsave("../figures/fig4E.svg", p_pca, width = 6, height = 4)
+ggsave("../figures/Baseline_PCA_BRB_effect_group.svg", p_pca, width = 6, height = 4)
 
 ```
 
+```{r}
+# ============================================================
+# CLEAN ADONIS ANALYSIS
+# Post-BRB microbiome ~ physical activity + baseline PCA PC1
+# ============================================================
+
+# Read fresh copies of the data
+rel_adonis_pca <- read_csv(
+  "../data/derived/bewell_taxonomy_relAbun.csv",
+  show_col_types = FALSE
+) %>%
+  mutate(
+    Subject.Number = as.character(Subject.Number),
+    RelAbun = as.numeric(RelAbun),
+    term = gsub(".*\\|", "", Taxonomy)
+  )
+
+demo_adonis_pca <- read.csv(
+  "../data/derived/09-10-21_demographics.csv"
+)
+```
 
 ```{r}
-# Baseline PCA scores with subject IDs
-pre_pc1 <- as.data.frame(pca_res$x[, 1:2]) %>%
+# Normalize subject ID column
+if ("subject_number" %in% names(demo_adonis_pca)) {
+  demo_adonis_pca <- demo_adonis_pca %>%
+    mutate(Subject.Number = as.character(subject_number))
+} else {
+  demo_adonis_pca <- demo_adonis_pca %>%
+    mutate(Subject.Number = as.character(Subject.Number))
+}
+
+activity_adonis_pca <- demo_adonis_pca %>%
+  mutate(
+    Activity_adonis = case_when(
+      IPAQscore == "HEPA active" ~ "Active",
+      METmins >= 5000 ~ "Active",
+      !is.na(IPAQscore) | !is.na(METmins) ~ "Inactive",
+      TRUE ~ NA_character_
+    )
+  ) %>%
+  select(
+    Subject.Number,
+    Activity_adonis
+  ) %>%
+  distinct()
+```
+
+```{r}
+paired_brb_ids_pca <- rel_adonis_pca %>%
+  filter(variable %in% c("rB", "tB")) %>%
+  distinct(Subject.Number, variable) %>%
+  count(Subject.Number, name = "n_timepoints") %>%
+  filter(n_timepoints == 2) %>%
+  pull(Subject.Number)
+
+length(paired_brb_ids_pca)
+```
+
+```{r}
+baseline_pca_df <- rel_adonis_pca %>%
+  filter(
+    variable == "rB",
+    Subject.Number %in% paired_brb_ids_pca
+  ) %>%
+  group_by(
+    Subject.Number,
+    term
+  ) %>%
+  summarise(
+    RelAbun = sum(RelAbun, na.rm = TRUE),
+    .groups = "drop"
+  ) %>%
+  pivot_wider(
+    names_from = term,
+    values_from = RelAbun,
+    values_fill = 0
+  ) %>%
+  arrange(Subject.Number)
+```
+
+```{r}
+baseline_pca_mat <- baseline_pca_df %>%
+  select(-Subject.Number) %>%
+  as.matrix()
+
+rownames(baseline_pca_mat) <- baseline_pca_df$Subject.Number
+
+# Remove zero-variance taxa before scaling
+baseline_pca_mat <- baseline_pca_mat[
+  ,
+  apply(baseline_pca_mat, 2, sd, na.rm = TRUE) > 0,
+  drop = FALSE
+]
+
+baseline_pca_fit <- prcomp(
+  baseline_pca_mat,
+  center = TRUE,
+  scale. = TRUE
+)
+
+baseline_pc_scores <- as.data.frame(
+  baseline_pca_fit$x[, 1:2, drop = FALSE]
+) %>%
   rownames_to_column("Subject.Number") %>%
   transmute(
     Subject.Number = as.character(Subject.Number),
-    Pre_PC1 = PC1,
-    Pre_PC2 = PC2
+    Pre_PC1_adonis = PC1,
+    Pre_PC2_adonis = PC2
   )
 ```
 
-
-
 ```{r}
-post_brb <- rel %>%
-  mutate(term = gsub(".*\\|", "", Taxonomy)) %>%
+post_brb_adonis_df <- rel_adonis_pca %>%
   filter(
     variable == "tB",
-    Subject.Number %in% pre_pc1$Subject.Number
+    Subject.Number %in% paired_brb_ids_pca
   ) %>%
-  group_by(Subject.Number, term) %>%
+  group_by(
+    Subject.Number,
+    term
+  ) %>%
   summarise(
     RelAbun = sum(RelAbun, na.rm = TRUE),
     .groups = "drop"
@@ -190,106 +295,853 @@ post_brb <- rel %>%
 ```
 
 ```{r}
-activity_meta <- ipaq %>%
-  mutate(subject_number = as.character(subject_number)) %>%
-  filter(
-    subject_number %in% combined_wide$Subject.Number,
-    !is.na(IPAQscore)
-  ) %>%
-  mutate(
-    metsTotal = METwalking + METmoderate + METvig + METmins,
-    Activity = if_else(
-      IPAQscore == "HEPA active" | metsTotal >= 5000,
-      "Active",
-      "Inactive"
-    ),
-    Subject.Number = subject_number
-  ) %>%
-  select(Subject.Number, Activity) %>%
-  distinct()
-```
-
-```{r}
-adonis_meta <- post_brb %>%
+adonis_meta_pca <- post_brb_adonis_df %>%
   select(Subject.Number) %>%
-  inner_join(activity_meta, by = "Subject.Number") %>%
-  inner_join(pre_pc1, by = "Subject.Number") %>%
+  inner_join(
+    baseline_pc_scores,
+    by = "Subject.Number"
+  ) %>%
+  inner_join(
+    activity_adonis_pca,
+    by = "Subject.Number"
+  ) %>%
   filter(
-    !is.na(Activity),
-    !is.na(Pre_PC1)
-  )
+    !is.na(Pre_PC1_adonis),
+    !is.na(Activity_adonis)
+  ) %>%
+  distinct(Subject.Number, .keep_all = TRUE)
 ```
 
 ```{r}
-table(adonis_meta$Activity)
+nrow(adonis_meta_pca)
 
-nrow(adonis_meta)
+table(adonis_meta_pca$Activity_adonis)
 
-anyDuplicated(adonis_meta$Subject.Number)
+anyDuplicated(adonis_meta_pca$Subject.Number)
 ```
 
 ```{r}
-post_mat <- post_brb %>%
-  filter(Subject.Number %in% adonis_meta$Subject.Number) %>%
-  arrange(match(Subject.Number, adonis_meta$Subject.Number)) %>%
+post_brb_adonis_mat <- post_brb_adonis_df %>%
+  filter(
+    Subject.Number %in% adonis_meta_pca$Subject.Number
+  ) %>%
+  arrange(
+    match(
+      Subject.Number,
+      adonis_meta_pca$Subject.Number
+    )
+  ) %>%
   select(-Subject.Number) %>%
   as.data.frame()
 
-rownames(post_mat) <- adonis_meta$Subject.Number
-```
+rownames(post_brb_adonis_mat) <-
+  adonis_meta_pca$Subject.Number
 
-```{r}
-identical(
-  rownames(post_mat),
-  adonis_meta$Subject.Number
-)
-```
-
-```{r}
-post_mat <- post_mat[
+# Remove taxa absent from everyone
+post_brb_adonis_mat <- post_brb_adonis_mat[
   ,
-  colSums(post_mat, na.rm = TRUE) > 0,
+  colSums(post_brb_adonis_mat, na.rm = TRUE) > 0,
   drop = FALSE
 ]
-```
 
+identical(
+  rownames(post_brb_adonis_mat),
+  adonis_meta_pca$Subject.Number
+)
+```
 ```{r}
-post_bray <- vegdist(
-  post_mat,
+post_bray_adonis_pca <- vegdist(
+  post_brb_adonis_mat,
   method = "bray"
 )
 ```
 
 ```{r}
-adonis_activity <- adonis2(
-  post_bray ~ Activity,
-  data = adonis_meta,
+set.seed(123)
+
+adonis_activity_pca <- adonis2(
+  post_bray_adonis_pca ~ Activity_adonis,
+  data = adonis_meta_pca,
   permutations = 9999
 )
 
-adonis_activity
+adonis_activity_pca
 ```
-
 ```{r}
-adonis_adjusted <- adonis2(
-  post_bray ~ Pre_PC1 + Activity,
-  data = adonis_meta,
+set.seed(123)
+
+adonis_pc1_activity_pca <- adonis2(
+  post_bray_adonis_pca ~ Pre_PC1_adonis + Activity_adonis,
+  data = adonis_meta_pca,
   permutations = 9999,
   by = "margin"
 )
 
-adonis_adjusted
+adonis_pc1_activity_pca
 ```
 
 ```{r}
-activity_dispersion <- betadisper(
-  post_bray,
-  adonis_meta$Activity
+activity_dispersion_pca <- betadisper(
+  post_bray_adonis_pca,
+  group = adonis_meta_pca$Activity_adonis
 )
 
-permutest(
-  activity_dispersion,
+set.seed(123)
+
+activity_dispersion_test_pca <- permutest(
+  activity_dispersion_pca,
   permutations = 9999
 )
+
+activity_dispersion_test_pca
+```
+
+```{r}
+length(paired_brb_ids_pca)
+
+nrow(adonis_meta_pca)
+
+table(adonis_meta_pca$Activity_adonis)
+
+identical(
+  rownames(post_brb_adonis_mat),
+  adonis_meta_pca$Subject.Number
+)
+
+adonis_activity_pca
+
+adonis_pc1_activity_pca
+
+activity_dispersion_test_pca
+```
+#-------new panel
+```{r}
+library(tidyverse)
+
+normalize_subject_id <- function(x) {
+  x %>%
+    as.character() %>%
+    str_extract("[0-9]+$") %>%
+    as.integer() %>%
+    as.character()
+}
+```
+
+```{r}
+
+smoking_clean <- BEWELL_demographics %>%
+  mutate(
+    Subject.Number = normalize_subject_id(`Subject ID`)
+  ) %>%
+  select(
+    Subject.Number,
+    Smoking = `Smoking status`
+  )
+```
+
+```{r}
+hei_clean <- bewelldietscore_07122022 %>%
+  mutate(
+    Subject.Number = normalize_subject_id(Username)
+  ) %>%
+  select(
+    Subject.Number,
+    HEI2015
+  )
+```
+
+```{r}
+smoking_clean %>%
+  count(Subject.Number) %>%
+  filter(n > 1)
+
+hei_clean %>%
+  count(Subject.Number) %>%
+  filter(n > 1)
+```
+
+```{r}
+adonis_covariates <- adonis_meta_pca %>%
+  mutate(
+    Subject.Number = as.character(Subject.Number)
+  ) %>%
+  left_join(
+    smoking_clean,
+    by = "Subject.Number"
+  ) %>%
+  left_join(
+    hei_clean,
+    by = "Subject.Number"
+  )
+```
+
+```{r}
+nrow(adonis_covariates)
+
+sum(is.na(adonis_covariates$Smoking))
+sum(is.na(adonis_covariates$HEI2015))
+
+table(adonis_covariates$Smoking, useNA = "ifany")
+summary(adonis_covariates$HEI2015)
+```
+
+```{r}
+adonis_covariates %>%
+  filter(
+    is.na(Smoking) |
+    is.na(HEI2015)
+  ) %>%
+  select(
+    Subject.Number,
+    Smoking,
+    HEI2015
+  )
+```
+```{r}
+# Check what the cleaned HEI table actually looks like
+head(hei_clean, 20)
+
+nrow(hei_clean)
+
+sum(!is.na(hei_clean$HEI2015))
+
+# Check normalized HEI subject IDs
+sort(unique(hei_clean$Subject.Number))
+
+# Check subject IDs in the ADONIS dataset
+sort(unique(adonis_meta_pca$Subject.Number))
+```
+```{r}
+intersect(
+  adonis_meta_pca$Subject.Number,
+  hei_clean$Subject.Number
+)
+```
+
+```{r}
+length(
+  intersect(
+    adonis_meta_pca$Subject.Number,
+    hei_clean$Subject.Number
+  )
+)
+```
+
+```{r}
+adonis_meta_pca %>%
+  select(Subject.Number) %>%
+  anti_join(
+    hei_clean %>% select(Subject.Number),
+    by = "Subject.Number"
+  )
+```
+# HEI ADONIS analysis
+```{r}
+adonis_meta_hei <- adonis_meta_pca %>%
+  left_join(
+    hei_clean,
+    by = "Subject.Number"
+  ) %>%
+  filter(!is.na(HEI2015))
+
+nrow(adonis_meta_hei)
+summary(adonis_meta_hei$HEI2015)
+```
+```{r}
+post_brb_hei_mat <- post_brb_adonis_df %>%
+  filter(
+    Subject.Number %in% adonis_meta_hei$Subject.Number
+  ) %>%
+  arrange(
+    match(
+      Subject.Number,
+      adonis_meta_hei$Subject.Number
+    )
+  ) %>%
+  select(-Subject.Number) %>%
+  as.data.frame()
+
+rownames(post_brb_hei_mat) <-
+  adonis_meta_hei$Subject.Number
+
+post_brb_hei_mat <- post_brb_hei_mat[
+  ,
+  colSums(post_brb_hei_mat, na.rm = TRUE) > 0,
+  drop = FALSE
+]
+
+identical(
+  rownames(post_brb_hei_mat),
+  adonis_meta_hei$Subject.Number
+)
+```
+```{r}
+post_bray_hei <- vegdist(
+  post_brb_hei_mat,
+  method = "bray"
+)
+```
+
+```{r}
+set.seed(123)
+
+adonis_hei <- adonis2(
+  post_bray_hei ~ HEI2015,
+  data = adonis_meta_hei,
+  permutations = 9999
+)
+
+adonis_hei
+```
+
+```{r}
+set.seed(123)
+
+adonis_hei_adjusted <- adonis2(
+  post_bray_hei ~ Pre_PC1_adonis + HEI2015,
+  data = adonis_meta_hei,
+  permutations = 9999,
+  by = "margin"
+)
+
+adonis_hei_adjusted
+```
+# SMOKING ADONIS analysis
+```{r}
+adonis_meta_smoking <- adonis_meta_pca %>%
+  left_join(
+    smoking_clean,
+    by = "Subject.Number"
+  ) %>%
+  filter(!is.na(Smoking))
+
+nrow(adonis_meta_smoking)
+
+table(
+  adonis_meta_smoking$Smoking,
+  useNA = "ifany"
+)
+```
+```{r}
+post_brb_smoking_mat <- post_brb_adonis_df %>%
+  filter(
+    Subject.Number %in% adonis_meta_smoking$Subject.Number
+  ) %>%
+  arrange(
+    match(
+      Subject.Number,
+      adonis_meta_smoking$Subject.Number
+    )
+  ) %>%
+  select(-Subject.Number) %>%
+  as.data.frame()
+
+rownames(post_brb_smoking_mat) <-
+  adonis_meta_smoking$Subject.Number
+
+# Remove taxa absent from all subjects
+post_brb_smoking_mat <- post_brb_smoking_mat[
+  ,
+  colSums(post_brb_smoking_mat, na.rm = TRUE) > 0,
+  drop = FALSE
+]
+
+identical(
+  rownames(post_brb_smoking_mat),
+  adonis_meta_smoking$Subject.Number
+)
+```
+
+```{r}
+post_bray_smoking <- vegdist(
+  post_brb_smoking_mat,
+  method = "bray"
+)
+```
+
+```{r}
+set.seed(123)
+
+adonis_smoking <- adonis2(
+  post_bray_smoking ~ Smoking,
+  data = adonis_meta_smoking,
+  permutations = 9999
+)
+
+adonis_smoking
+```
+
+```{r}
+set.seed(123)
+
+adonis_smoking_adjusted <- adonis2(
+  post_bray_smoking ~ Pre_PC1_adonis + Smoking,
+  data = adonis_meta_smoking,
+  permutations = 9999,
+  by = "margin"
+)
+
+adonis_smoking_adjusted
+```
+
+```{r}
+smoking_dispersion <- betadisper(
+  post_bray_smoking,
+  group = as.factor(adonis_meta_smoking$Smoking)
+)
+
+set.seed(123)
+
+smoking_dispersion_test <- permutest(
+  smoking_dispersion,
+  permutations = 9999
+)
+
+smoking_dispersion_test
+```
+
+```{r}
+nrow(adonis_meta_smoking)
+
+table(adonis_meta_smoking$Smoking)
+
+identical(
+  rownames(post_brb_smoking_mat),
+  adonis_meta_smoking$Subject.Number
+)
+
+adonis_smoking
+
+adonis_smoking_adjusted
+
+smoking_dispersion_test
+```
+# ADONIS summary panel: Activity, HEI, Smoking
+# Each variable is tested after accounting for baseline PCA PC1
+```{r}
+adonis_panel_df <- tibble(
+  Variable = c(
+    "Physical activity",
+    "HEI-2015",
+    "Smoking status"
+  ),
+
+  R2 = c(
+    adonis_pc1_activity_pca["Activity_adonis", "R2"],
+    adonis_hei_adjusted["HEI2015", "R2"],
+    adonis_smoking_adjusted["Smoking", "R2"]
+  ),
+
+  P_value = c(
+    adonis_pc1_activity_pca["Activity_adonis", "Pr(>F)"],
+    adonis_hei_adjusted["HEI2015", "Pr(>F)"],
+    adonis_smoking_adjusted["Smoking", "Pr(>F)"]
+  ),
+
+  n = c(
+    nrow(adonis_meta_pca),
+    nrow(adonis_meta_hei),
+    nrow(adonis_meta_smoking)
+  )
+)
+
+adonis_panel_df
+```
+```{r}
+adonis_panel_df <- adonis_panel_df %>%
+  mutate(
+    Variable = factor(
+      Variable,
+      levels = rev(c(
+        "Physical activity",
+        "HEI-2015",
+        "Smoking status"
+      ))
+    ),
+
+    result_label = paste0(
+      "P = ", sprintf("%.3f", P_value),
+      ", n = ", n
+    )
+  )
+```
+
+```{r}
+p_adonis_panel <- ggplot(
+  adonis_panel_df,
+  aes(
+    x = R2,
+    y = Variable
+  )
+) +
+  geom_segment(
+    aes(
+      x = 0,
+      xend = R2,
+      yend = Variable
+    ),
+    linewidth = 0.7
+  ) +
+  geom_point(
+    size = 3
+  ) +
+  geom_text(
+    aes(
+      label = result_label
+    ),
+    hjust = 0,
+    nudge_x = 0.004,
+    size = 3.5
+  ) +
+  scale_x_continuous(
+    labels = scales::percent_format(accuracy = 1),
+    expand = expansion(mult = c(0, 0.40))
+  ) +
+  labs(
+    x = expression("Marginal " * R^2),
+    y = NULL
+  ) +
+  theme_bw(base_size = 12) +
+  theme(
+    panel.grid.major.y = element_blank(),
+    panel.grid.minor = element_blank()
+  )
+
+p_adonis_panel
+```
+```{r}
+set.seed(123)
+
+adonis_pc1_only <- adonis2(
+  post_bray_adonis_pca ~ Pre_PC1_adonis,
+  data = adonis_meta_pca,
+  permutations = 9999
+)
+
+adonis_pc1_only
+```
+```{r}
+adonis_activity_pca
+adonis_hei
+adonis_smoking
+```
+
+```{r}
+adonis_panel_df <- tibble(
+  Variable = c(
+    "Baseline microbiome PC1",
+    "Physical activity",
+    "HEI-2015",
+    "Smoking status"
+  ),
+
+  R2 = c(
+    adonis_pc1_only["Model", "R2"],
+    adonis_activity_pca["Model", "R2"],
+    adonis_hei["Model", "R2"],
+    adonis_smoking["Model", "R2"]
+  ),
+
+  P_value = c(
+    adonis_pc1_only["Model", "Pr(>F)"],
+    adonis_activity_pca["Model", "Pr(>F)"],
+    adonis_hei["Model", "Pr(>F)"],
+    adonis_smoking["Model", "Pr(>F)"]
+  ),
+
+  n = c(
+    nrow(adonis_meta_pca),
+    nrow(adonis_meta_pca),
+    nrow(adonis_meta_hei),
+    nrow(adonis_meta_smoking)
+  )
+)
+
+adonis_panel_df
+```
+```{r}
+adonis_panel_df <- adonis_panel_df %>%
+  mutate(
+    Variable = factor(
+      Variable,
+      levels = rev(c(
+        "Baseline microbiome PC1",
+        "Physical activity",
+        "HEI-2015",
+        "Smoking status"
+      ))
+    ),
+
+    result_label = paste0(
+      "P = ", sprintf("%.3f", P_value),
+      ", n = ", n
+    )
+  )
+
+p_adonis_panel <- ggplot(
+  adonis_panel_df,
+  aes(x = R2, y = Variable)
+) +
+  geom_segment(
+    aes(
+      x = 0,
+      xend = R2,
+      yend = Variable
+    ),
+    linewidth = 0.7
+  ) +
+  geom_point(size = 3) +
+  geom_text(
+    aes(label = result_label),
+    hjust = 0,
+    nudge_x = 0.004,
+    size = 3.5
+  ) +
+  scale_x_continuous(
+    labels = scales::percent_format(accuracy = 1),
+    expand = expansion(mult = c(0, 0.40))
+  ) +
+  labs(
+    x = expression(R^2),
+    y = NULL
+  ) +
+  theme_bw(base_size = 12) +
+  theme(
+    panel.grid.major.y = element_blank(),
+    panel.grid.minor = element_blank()
+  )
+
+p_adonis_panel
+```
+```{r}
+adonis_pc1_only
+```
+
+```{r}
+p_adonis_panel2 <- ggplot(
+  adonis_panel_df,
+  aes(x = R2, y = Variable)
+) +
+  geom_point(size = 3.5) +
+  geom_text(
+    aes(
+      label = paste0(
+        "R² = ", sprintf("%.3f", R2),
+        ", P = ", sprintf("%.3f", P_value),
+        ", n = ", n
+      )
+    ),
+    hjust = 0,
+    nudge_x = 0.004,
+    size = 3.4
+  ) +
+  scale_x_continuous(
+    labels = scales::percent_format(accuracy = 1),
+    expand = expansion(mult = c(0.05, 0.75))
+  ) +
+  labs(
+    x = expression(R^2),
+    y = NULL
+  ) +
+  theme_bw(base_size = 15) +
+  theme(
+    panel.grid.major.y = element_blank(),
+    panel.grid.minor = element_blank()
+  )
+
+p_adonis_panel2
+
+ggsave(
+  "../figures/ADONIS_univariate_main.svg",
+  plot = p_adonis_panel2,
+  width = 6,
+  height = 4
+)
+```
+# FINAL ADONIS PANEL: baseline PCA PC1 + physical activity
+# Marginal effects from the same joint PERMANOVA model
+```{r}
+adonis_panel_pc1_activity <- tibble(
+  Variable = c(
+    "Baseline microbiome PC1",
+    "Physical activity"
+  ),
+  R2 = c(
+    adonis_pc1_activity_pca["Pre_PC1_adonis", "R2"],
+    adonis_pc1_activity_pca["Activity_adonis", "R2"]
+  ),
+  P_value = c(
+    adonis_pc1_activity_pca["Pre_PC1_adonis", "Pr(>F)"],
+    adonis_pc1_activity_pca["Activity_adonis", "Pr(>F)"]
+  ),
+  n = c(
+    nrow(adonis_meta_pca),
+    nrow(adonis_meta_pca)
+  )
+)
+
+adonis_panel_pc1_activity
+```
+```{r}
+adonis_panel_pc1_activity <- adonis_panel_pc1_activity %>%
+  mutate(
+    Variable = factor(
+      Variable,
+      levels = rev(c(
+        "Baseline microbiome PC1",
+        "Physical activity"
+      ))
+    ),
+    label = paste0(
+      "R² = ", sprintf("%.3f", R2),
+      ", P = ", sprintf("%.3f", P_value),
+      ", n = ", n
+    )
+  )
+
+p_adonis_pc1_activity <- ggplot(
+  adonis_panel_pc1_activity,
+  aes(x = R2, y = Variable)
+) +
+  geom_point(size = 3.5) +
+  geom_text(
+    aes(label = label),
+    hjust = 0,
+    nudge_x = 0.002,
+    size = 3.4
+  ) +
+  scale_x_continuous(
+    limits = c(0, 0.08),
+    breaks = seq(0, 0.08, by = 0.02),
+    labels = scales::percent_format(accuracy = 1),
+    expand = expansion(mult = c(0, 0.05))
+  ) +
+  labs(
+    x = expression("Marginal " * R^2 * ""),
+    y = NULL
+  ) +
+  theme_bw(base_size = 12) +
+  theme(
+    panel.grid.major.y = element_blank(),
+    panel.grid.minor = element_blank()
+  )
+
+p_adonis_pc1_activity
+
+ggsave(
+  "../figures/ADONIS_multivariate.svg",
+  plot = p_adonis_pc1_activity,
+  width = 6,
+  height = 4
+)
+```
+
+# MAIN FIGURE: univariate PERMANOVA
+# Baseline PCA PC1 and physical activity tested separately
+```{r}
+adonis_pc1_only
+
+set.seed(123)
+
+adonis_pc1_only <- adonis2(
+  post_bray_adonis_pca ~ Pre_PC1_adonis,
+  data = adonis_meta_pca,
+  permutations = 9999
+)
+
+set.seed(123)
+
+adonis_activity_only <- adonis2(
+  post_bray_adonis_pca ~ Activity_adonis,
+  data = adonis_meta_pca,
+  permutations = 9999
+)
+
+adonis_pc1_only
+adonis_activity_only
+```
+```{r}
+adonis_main_panel <- tibble(
+  Variable = c(
+    "Baseline microbiome PC1",
+    "Physical activity"
+  ),
+  R2 = c(
+    adonis_pc1_only["Model", "R2"],
+    adonis_activity_only["Model", "R2"]
+  ),
+  P_value = c(
+    adonis_pc1_only["Model", "Pr(>F)"],
+    adonis_activity_only["Model", "Pr(>F)"]
+  ),
+  n = c(
+    nrow(adonis_meta_pca),
+    nrow(adonis_meta_pca)
+  )
+)
+
+adonis_main_panel
+```
+
+```{r}
+adonis_main_panel <- adonis_main_panel %>%
+  mutate(
+    Variable = factor(
+      Variable,
+      levels = rev(c(
+        "Baseline microbiome PC1",
+        "Physical activity"
+      ))
+    ),
+    label = paste0(
+      "R² = ", sprintf("%.3f", R2),
+      ", P = ", sprintf("%.3f", P_value),
+      ", n = ", n
+    )
+  )
+
+p_adonis_main <- ggplot(
+  adonis_main_panel,
+  aes(x = R2, y = Variable)
+) +
+  geom_point(size = 3.5) +
+  geom_text(
+    aes(label = label),
+    hjust = 0,
+    nudge_x = 0.002,
+    size = 3.4
+  ) +
+  scale_x_continuous(
+  limits = c(0, 0.11),
+  breaks = seq(0, 0.10, by = 0.02),
+  labels = scales::percent_format(accuracy = 1),
+  expand = expansion(mult = c(0, 0.02))
+) +
+  labs(
+    x = expression(R^2),
+    y = NULL
+  ) +
+  theme_bw(base_size = 12) +
+  theme(
+    panel.grid.major.y = element_blank(),
+    panel.grid.minor = element_blank()
+  )
+
+p_adonis_main
+```
+
+```{r}
+activity_dispersion_pca <- betadisper(
+  post_bray_adonis_pca,
+  group = adonis_meta_pca$Activity_adonis
+)
+
+set.seed(123)
+activity_dispersion_test_pca <- permutest(
+  activity_dispersion_pca,
+  permutations = 9999
+)
+
+activity_dispersion_test_pca
 ```
 
