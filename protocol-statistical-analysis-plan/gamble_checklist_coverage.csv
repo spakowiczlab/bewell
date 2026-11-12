@@ -1,0 +1,56 @@
+item,topic,sap_section,status
+1a,Title,Title,Covered
+1b,Registration,Title,Confirm
+2,Version,Title and 1,Confirm
+3,Protocol,Title,Covered
+4a,History,1,Confirm
+4b,Reasons,1,Covered
+4c,Timing,1,Confirm
+5,Contributors,1,Confirm
+6a,Writer approval,1,Confirm
+6b,Statistician approval,1,Confirm
+6c,Clinical approval,1,Confirm
+7,Rationale,2,Covered
+8,Objectives,2,Covered
+9,Design,3,Covered
+10,Allocation,3,Confirm
+11,Power,3,Covered
+12,Framework,3,Covered
+13a,Interim analyses,3,Confirm
+13b,Interim alpha,3,Confirm
+13c,Stopping,3,Covered
+14,Final timing,3,Confirm
+15,Visits,3,Confirm
+16,Alpha,4,Covered
+17,Multiplicity,4,Confirm
+18,Intervals,4,Confirm
+19a,Adherence definition,4,Confirm
+19b,Adherence reporting,4,Covered
+19c,Deviation definition,4,Confirm
+19d,Deviation reporting,4,Covered
+20,Populations,4,Confirm
+21,Screening,5,Confirm
+22,Eligibility,5,Covered
+23,Flow,5,Covered
+24a,Withdrawal scope,5,Covered
+24b,Withdrawal timing,5,Covered
+24c,Withdrawal reasons,5,Covered
+25a,Baseline variables,5,Confirm
+25b,Baseline summaries,5,Covered
+26a,Outcome hierarchy,2 and 6,Confirm
+26b,Units,6,Confirm
+26c,Derivations,6,Confirm
+27a,Estimation,7,Confirm
+27b,Covariates,7 and 8,Confirm
+27c,Diagnostics,8,Confirm
+27d,Alternatives,8,Confirm
+27e,Sensitivity,8,Confirm
+27f,Subgroups,7 and 9,Confirm
+28,Missingness,8,Confirm
+29,Other analyses,9,Confirm
+30,Harms,9,Confirm
+31,Software,10,Covered
+32a,Methods sources,11,Covered
+32b,Data plan,10,Confirm
+32c,Master files,10,Confirm
+32d,SOPs,10,Confirm

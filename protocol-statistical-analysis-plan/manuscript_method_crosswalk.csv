@@ -1,0 +1,16 @@
+analysis,repository_source,implemented_method,SAP_section,information_needed
+Baseline cohorts,table1_baseline.R,consented and completed_all_visits overlapping cohorts; tableone,5,HEI version/boundaries and age eligibility
+Recruitment curves,Cumulative_participants.Rmd,monthly/cumulative counts by recruitment source,5,adherence/return figures and recruitment-yield source absent
+Urine metabolite tests,metabolites_bewell.Rmd,paired Wilcoxon rB/tB; BH across metabolites,4 and 7.1,zero conversion and single-column analyte filter
+Polyphenol responder subset,metabolites_bewell.Rmd,mean z-scored changes in raw-P<.05 metabolites; >= median,4 and 7.1,final median split overrides two-cluster code
+Cytokine individual models,cytokines_bewell.Rmd,glmer post-BRB ~ concentration + (1|participant); all and responders,7.2,raw P; no period/sequence adjustment; final model table needed
+Cytokine QC,processing_cytokines_avg-res.Rmd,exclude concentration AND CV outliers then average replicates,8,pooled CV quantiles inequality conversion and NaN-to-zero
+Cytokine CCA,cytokines_bewell.Rmd,canonical correspondence; smoking race age sex urine-metabolite PC1; sequential 9999,7.3,13-feature heatmap versus 14-feature CCA request
+Cytokine PCA/PERMANOVA,cytokines_bewell.Rmd,scaled cytokine changes; urine PC1 ntile(2); Euclidean adonis2 default999,7.3,confirm final analyte matrix and PC1 orientation
+Active taxon model,conrad_bewell_data_for_mimic.Rmd,binomial glm post-BRB vs all other visits ~ relative abundance,7.4,conflicts with manuscript mixed/linear model and BH descriptions
+Saved taxon model,Figure4C&D-bewell.Rmd and data/model_stats_BW.rda,model_res_BW raw-P<.05 selector,7.4,generating formula and full adjustment code unavailable
+Alpha diversity,alpha_diversity_check.Rmd,Simpson concatenated seven ranks; unpaired Welch rB/tB and rP/tP,7.5,conflicts with paired manuscript wording; repeated ranks
+Microbiome response groups,Figure4C&D-bewell.Rmd,selected-taxon sum ratio pseudocount1e-6 >=2; scaled baseline PCA; Bray Curtis PERMANOVA,7.5,outcome selected groups and constant PCA features
+Activity PERMANOVA,Figure4C&D-bewell.Rmd,HEPA or MET sum>=5000; post-BRB Bray Curtis; marginal Pre_PC1+Activity;9999,7.6,univariate HEI/smoking panel generating code absent
+Lachnospiraceae activity display,ACSgrant_IPAQbrb.Rmd,(post-pre)^2/2>=40.5; proportions by Activity,7.6,missing Activity field; separate 3-unit Fisher rule
+Nasal sampling removal,Study investigator clarification; protocol amendment reference pending,Removed during COVID-19 because nasal swabbing was classified as aerosol generating and created major logistical barriers,2 6 and 7.7,Amendment version effective date and IRB approval reference

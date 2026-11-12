@@ -1,0 +1,209 @@
+---
+title: "BE WELL implemented manuscript analyses"
+output: html_document
+params:
+  run_taxon_glm: true
+  run_cytokine_models: true
+  run_cytokine_multivariate: false
+  multivariate_include_il17f: false
+  activity_manifest: ""
+---
+
+This notebook implements verified methods from `../manuscript/scripts`. It writes
+new outputs without changing source data, manuscript figures or submitted results.
+Where prose, active code and saved result tables disagree, the SAP Word comments
+and `manuscript_method_crosswalk.csv` identify the information needed to finalize
+the record. Reruns are labeled reconstruction until matched to submitted outputs.
+
+Nasal sampling was removed during COVID-19 because it was classified as an
+aerosol-generating procedure and created major logistical barriers. Analyses
+requiring nasal gene-expression data are outside this workflow.
+
+```{r setup}
+knitr::opts_chunk$set(error=FALSE)
+source('manuscript_methods.R')
+manuscript_cfg<-list(data_dir=normalizePath('../data'),
+                    output_dir=Sys.getenv('BEWELL_MANUSCRIPT_OUTPUT','outputs/manuscript-methods'))
+dir.create(manuscript_cfg$output_dir,recursive=TRUE,showWarnings=FALSE)
+need_manuscript('vegan');need_manuscript('dplyr');need_manuscript('tidyr')
+clinical<-readRDS(file.path(manuscript_cfg$data_dir,'derived/clinical_manuscript.rds'))
+write_manuscript(data.frame(cohort=c('consented','completed_all_visits'),
+  n=c(sum(clinical$subjects$consented),sum(clinical$subjects$completed_all_visits))), 'cohort_counts.csv')
+# These are manuscript cohort counts, not a verified randomization denominator.
+```
+
+```{r table1}
+# Run the exact Table 1 source against a temporary repository layout, protecting originals.
+# Its category boundary gaps are intentionally preserved pending SAP comment resolution.
+need_manuscript('tableone')
+temp_repo<-tempfile('bewell_table1_');dir.create(file.path(temp_repo,'data','derived'),recursive=TRUE)
+saveRDS(clinical,file.path(temp_repo,'data','derived','clinical_manuscript.rds'))
+local({
+ oldwd<-getwd();on.exit(setwd(oldwd),add=TRUE)
+ source_path<-normalizePath('../manuscript/scripts/table1_baseline.R')
+ setwd(temp_repo);source(source_path,local=new.env())
+})
+file.copy(file.path(temp_repo,'manuscript','tables','table1_baseline.csv'),
+          file.path(manuscript_cfg$output_dir,'table1_baseline.csv'),overwrite=TRUE)
+unlink(temp_repo,recursive=TRUE)
+```
+
+```{r metabolites}
+met<-metabolite_data(clinical)
+tests<-metabolite_tests(met);write_manuscript(tests,'metabolite_paired_tests.csv')
+response<-responder_score(met,tests);write_manuscript(response,'polyphenol_response_reconstructed.csv')
+# Compare the median-split reconstruction to the actual exported file.
+saved<-read_repo_csv('derived/compliance_cluster_df.csv',row.names=1)
+saved$subject<-rownames(saved)
+comparison<-merge(response,saved,by='subject',all=TRUE,suffixes=c('_reconstructed','_saved'))
+comparison$agrees<-comparison$BRB_response_reconstructed==comparison$BRB_response_saved
+write_manuscript(comparison,'responder_file_comparison.csv')
+# The original source writes two BRB-change files; reproduce their intended content here.
+changes<-paired_visit(met,'metabolite')
+write_manuscript(changes,'metabolite_brb_changes.csv')
+selected<-tests$metabolite[tests$treatment=='BRB'&!is.na(tests$p)&tests$p<.05]
+write_manuscript(data.frame(metabolite=selected),'metabolites_selected_by_raw_p.csv')
+```
+
+```{r cytokines}
+cyto<-cytokine_data(clinical)
+analytes<-c('ALCAM.CD166','C.Reactive.Protein.CRP','CCL2.JE.MCP.1','Complement.Component.C9',
+ 'Cystatin.C','IL.1.beta.IL.1F2','IL.10','IL.12.IL.23.p40','IL.6','MMP.2','S100A9',
+ 'TNF.alpha','vWF.A2','IL.17F')
+if(params$run_cytokine_models) {
+ write_manuscript(cytokine_glmm(cyto,analytes),'cytokine_glmm_all.csv')
+ # Use the saved exported object, not an unverified in-memory notebook object.
+ responder_ids<-saved$subject[saved$BRB_response=='Responder']
+ write_manuscript(cytokine_glmm(cyto,analytes,responder_ids),'cytokine_glmm_responders.csv')
+}
+# Prepare changes for both the source heatmap panel and the disputed CCA panel.
+cc<-cyto[cyto$timepoint.label %in% c('preBRB','postBRB'),]
+cc<-aggregate(avg.res~subject+cytokine+timepoint.label,cc,mean,na.rm=TRUE)
+names(cc)[names(cc)=='subject']<-'Subject.Number';names(cc)[names(cc)=='timepoint.label']<-'Timepoint'
+cc$Timepoint<-ifelse(cc$Timepoint=='preBRB','rB','tB');names(cc)[names(cc)=='avg.res']<-'value'
+cchanges<-paired_visit(cc,'cytokine');cM<-make_matrix(cchanges,'Subject.Number','cytokine','change')
+# Source heatmap contiguous range ALCAM through vWF excludes appended IL17F.
+heat_analytes<-setdiff(analytes,'IL.17F');heat<-scale(cM[,heat_analytes,drop=FALSE])
+write_manuscript(data.frame(subject=rownames(heat),heat,check.names=FALSE),'cytokine_heatmap_zscores.csv')
+```
+
+```{r cytokine-multivariate}
+# Disabled until the actual 13/14-feature matrix is confirmed; do not guess a final panel.
+if(params$run_cytokine_multivariate) {
+ features<-if(params$multivariate_include_il17f)analytes else heat_analytes
+ C<-scale(cM[,features,drop=FALSE]);M<-make_matrix(changes,'Subject.Number','metabolite','change')
+ M<-M[complete.cases(M),,drop=FALSE]
+ if(any(!is.finite(scale(M))))stop('Nonfinite/zero-variance metabolite PCA column.')
+ mp<-prcomp(M,scale.=TRUE)
+ meta<-clinical$subjects;meta$subject<-participant_key(meta$subject_number)
+ meta<-meta[match(rownames(C),meta$subject),]
+ meta$Smoking<-factor(meta[['Smoking status']]);meta$RaceEth<-factor(meta[['Race/ethnicity']])
+ meta$Gender<-factor(meta$Gender);meta$UrinePoly_all<-mp$x[match(meta$subject,rownames(mp$x)),1]
+ complete<-complete.cases(C,meta[,c('Smoking','RaceEth','Age','Gender','UrinePoly_all')])
+ C<-C[complete,,drop=FALSE];meta<-meta[complete,]
+ # Literal source row-sum exclusion before positive shifting.
+ positive<-rowSums(C)>0;shifted<-C[positive,,drop=FALSE];cca_meta<-meta[positive,]
+ if(min(shifted)<=0)shifted<-shifted-min(shifted)+1e-6
+ fit<-vegan::cca(shifted~Smoking+RaceEth+Age+Gender+UrinePoly_all,data=cca_meta)
+ set.seed(123);terms<-anova(fit,by='term',permutations=9999)
+ write_manuscript(data.frame(term=rownames(terms),terms),'cytokine_CCA_sequential_terms.csv')
+ meta$PolyGroup_all<-factor(dplyr::ntile(meta$UrinePoly_all,2),labels=c('Low','High'))
+ pc<-prcomp(C,scale.=TRUE);dd<-vegan::vegdist(C,method='euclidean')
+ set.seed(123);test<-vegan::adonis2(dd~PolyGroup_all,data=meta)
+ write_manuscript(data.frame(term=rownames(test),test),'cytokine_polyphenol_PERMANOVA.csv')
+ write_manuscript(data.frame(subject=meta$subject,pc$x,PolyGroup=meta$PolyGroup_all),'cytokine_PCA.csv')
+ write_manuscript(data.frame(includes_il17f=params$multivariate_include_il17f,
+   complete_subjects=nrow(C),CCA_subjects=nrow(shifted),status='requires final-panel confirmation'),
+   'cytokine_multivariate_provenance.csv')
+} else write_manuscript(data.frame(status='not run: confirm actual 13/14-analyte matrix'),
+                       'cytokine_multivariate_provenance.csv')
+```
+
+```{r microbial-models-and-diversity}
+tables<-rank_tables()
+if(params$run_taxon_glm)write_manuscript(taxon_glm(tables),'active_taxon_glm_raw_p.csv')
+simpson<-simpson_source(tables);write_manuscript(simpson,'source_multirank_simpson.csv')
+diversity_tests<-lapply(c('BRB','placebo'),function(tr) {
+ pre<-simpson$Simpson[simpson$timepoint==if(tr=='BRB')'rB' else 'rP']
+ post<-simpson$Simpson[simpson$timepoint==if(tr=='BRB')'tB' else 'tP']
+ t<-t.test(pre,post)
+ data.frame(treatment=tr,n_pre=sum(!is.na(pre)),n_post=sum(!is.na(post)),
+   contrast='pre_minus_post unpaired Welch',estimate=mean(pre)-mean(post),
+   lower=t$conf.int[1],upper=t$conf.int[2],p=t$p.value)
+})
+write_manuscript(do.call(rbind,diversity_tests),'source_simpson_Welch_tests.csv')
+# This saved model table supplies the response grouping. Its fitting code is missing.
+e<-new.env();load(file.path(manuscript_cfg$data_dir,'model_stats_BW.rda'),envir=e)
+model_res_BW<-e$model_res_BW
+write_manuscript(model_res_BW,'saved_model_res_BW.csv')
+rel<-read_repo_csv('derived/bewell_taxonomy_relAbun.csv')
+rel$Subject.Number<-as.character(rel$Subject.Number)
+groups<-microbiome_groups(rel,model_res_BW);write_manuscript(groups,'microbiome_response_groups.csv')
+base<-base_microbiome_matrix(rel,groups$Subject.Number,'rB')
+meta<-groups[match(rownames(base),groups$Subject.Number),]
+# Source PCA does not remove constant columns. Record any execution obstacle.
+constant<-apply(base,2,sd)==0
+if(any(constant)) {
+ write_manuscript(data.frame(feature=colnames(base)[constant]),'baseline_PCA_constant_features.csv')
+ message('Source PCA has constant columns; no silent filter or replacement PCA performed.')
+ base_pc<-NULL
+} else {
+ base_pc<-prcomp(base,scale.=TRUE)
+ write_manuscript(data.frame(subject=rownames(base),base_pc$x,group=meta$brb_status),'baseline_microbiome_PCA.csv')
+}
+dd<-vegan::vegdist(base,method='bray')
+# Original source has no local seed. Seed 123 makes this rerun reproducible;
+# exact permutation P values may differ from a previously saved plot.
+set.seed(123);test<-vegan::adonis2(dd~brb_status,data=meta)
+write_manuscript(data.frame(term=rownames(test),test),'baseline_response_PERMANOVA.csv')
+```
+
+```{r physical-activity}
+if(!is.null(base_pc)) {
+ post<-base_microbiome_matrix(rel,groups$Subject.Number,'tB')
+ subj<-clinical$subjects;subj$subject<-participant_key(subj$subject_number)
+ subj$metsTotal<-subj$METwalking+subj$METmoderate+subj$METvig+subj$METmins
+ # This definition is explicit in Figure4C&D-bewell.Rmd's PERMANOVA path.
+ subj$Activity<-ifelse(subj$IPAQscore=='HEPA active'|subj$metsTotal>=5000,'Active','Inactive')
+ meta<-subj[match(rownames(post),subj$subject),];meta$Pre_PC1<-base_pc$x[match(meta$subject,rownames(base_pc$x)),1]
+ keep<-complete.cases(meta[,c('Activity','Pre_PC1','IPAQscore')]);meta<-meta[keep,];post<-post[keep,,drop=FALSE]
+ post<-post[,colSums(post,na.rm=TRUE)>0,drop=FALSE];dd<-vegan::vegdist(post,method='bray')
+ set.seed(123);unadjusted<-vegan::adonis2(dd~Activity,data=meta,permutations=9999)
+ set.seed(123);adjusted<-vegan::adonis2(dd~Pre_PC1+Activity,data=meta,permutations=9999,by='margin')
+ set.seed(123);disp<-vegan::permutest(vegan::betadisper(dd,meta$Activity),permutations=9999)
+ write_manuscript(data.frame(term=rownames(unadjusted),unadjusted),'activity_PERMANOVA.csv')
+ write_manuscript(data.frame(term=rownames(adjusted),adjusted),'activity_PC1_adjusted_PERMANOVA.csv')
+ write_manuscript(data.frame(term=rownames(disp$tab),disp$tab),'activity_dispersion.csv')
+}
+# The separate Lachnospiraceae display depends on an unavailable Activity field
+# and a low-post-cyanidin subset. It is disabled until an adjudicated subject manifest exists.
+if(nzchar(params$activity_manifest)) {
+ approved<-read.csv(params$activity_manifest,stringsAsFactors=FALSE)
+ if(!all(c('subject','Activity','included') %in% names(approved)))stop('Activity manifest contract invalid.')
+ if(anyDuplicated(approved$subject)||!all(approved$included %in% c(0,1)))stop('Invalid activity manifest.')
+ a<-rel[grepl('f__Lachnospiraceae',rel$Taxonomy)&rel$variable %in% c('rB','tB'),]
+ a<-aggregate(RelAbun~Subject.Number+variable,a,sum,na.rm=TRUE)
+ names(a)[2:3]<-c('Timepoint','value');a$feature<-'Lachnospiraceae'
+ w<-paired_visit(a,'feature');w<-w[is.finite(w$pre)&is.finite(w$post),]
+ w$subject<-w$Subject.Number;w<-merge(w,approved,by='subject');w<-w[w$included==1,]
+ w$variance_two_values<-(w$post-w$pre)^2/2
+ w$response<-ifelse(w$variance_two_values>=40.5,'BRB Effective','BRB Not Effective')
+ counts<-as.data.frame(table(w$Activity,w$response));names(counts)<-c('Activity','response','n')
+ counts$percent<-100*counts$n/ave(counts$n,counts$Activity,FUN=sum)
+ write_manuscript(counts,'Lachnospiraceae_activity_barplot_counts.csv')
+} else write_manuscript(data.frame(status='not run: final Activity/cohort manifest absent'),
+                       'Lachnospiraceae_activity_provenance.csv')
+```
+
+```{r provenance}
+inputs<-c('derived/clinical_manuscript.rds','derived/cytokines_avg-results.csv',
+ 'derived/compliance_cluster_df.csv','derived/bewell_taxonomy_relAbun.csv','model_stats_BW.rda',
+ 'raw/urine-metabolomics/Dan Urine Anthocyanin 11-10-2022.xlsx')
+inputs<-c(inputs,paste0('derived/RelAbun/RelAbun_',names(tables),'.csv'))
+write_manuscript(data.frame(file=inputs,md5=unname(tools::md5sum(file.path(manuscript_cfg$data_dir,inputs)))),
+                 'input_hashes.csv')
+capture.output(sessionInfo(),file=file.path(manuscript_cfg$output_dir,'sessionInfo.txt'))
+dput(params,file=file.path(manuscript_cfg$output_dir,'render_parameters.R'))
+# No global Holm or BH step is added to raw model results. Such a change would
+# require a documented decision and reconciliation with final manuscript tables.
+```
