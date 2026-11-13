@@ -1,0 +1,110 @@
+---
+title: "BEWELL BioSample Metadata"
+author: "Shiva Jahanbakhshi"
+date: "2026-11-13"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## Import metadata
+
+```{r}
+file <- "../../data/MIMS.me.human-gut.6.0.bewell.tsv"
+
+lines <- readLines(file, warn = FALSE)
+header_row <- grep("^\\*sample_name\\t", lines)
+stopifnot(length(header_row) == 1)
+
+metadata <- read.delim(
+  file,
+  skip = header_row - 1,
+  check.names = FALSE,
+  colClasses = "character",
+  quote = "",
+  comment.char = "",
+  na.strings = character()
+)
+
+dim(metadata)
+```
+
+## Update geographic metadata
+
+```{r}
+metadata[["*geo_loc_name"]] <- "USA: Ohio"
+metadata[["*lat_lon"]] <- "restricted access"
+
+table(metadata[["*collection_date"]])
+```
+
+## Validate metadata
+
+```{r}
+stopifnot(
+  nrow(metadata) == 128,
+  ncol(metadata) == 61,
+  !anyDuplicated(metadata[["*sample_name"]]),
+  !anyDuplicated(metadata$filename),
+  all(metadata[["*geo_loc_name"]] == "USA: Ohio"),
+  all(metadata[["*lat_lon"]] == "restricted access"),
+  all(metadata$filename ==
+        paste0(metadata$source_material_id, ".fastq.gz"))
+)
+
+table(metadata$timepoint, metadata$chem_administration)
+length(unique(metadata$host_subject_id))
+```
+
+## Check required fields
+
+```{r}
+required_cols <- grep("^\\*", names(metadata), value = TRUE)
+
+required_missing <- sapply(metadata[required_cols], function(x) {
+  sum(is.na(x) | trimws(x) %in% c("", "missing", "not provided"))
+})
+
+required_missing
+```
+
+## Export metadata
+
+```{r}
+output_file <- "../../data/MIMS.me.human-gut.6.0.bewell_reviewed.tsv"
+
+tmp <- tempfile()
+
+write.table(
+  metadata,
+  tmp,
+  sep = "\t",
+  quote = FALSE,
+  row.names = FALSE,
+  na = ""
+)
+
+writeLines(
+  c(
+    if (header_row > 1) lines[seq_len(header_row - 1)],
+    readLines(tmp, warn = FALSE)
+  ),
+  output_file
+)
+
+unlink(tmp)
+
+reviewed <- read.delim(
+  output_file,
+  skip = header_row - 1,
+  check.names = FALSE,
+  colClasses = "character",
+  quote = "",
+  comment.char = "",
+  na.strings = character()
+)
+
+stopifnot(identical(metadata, reviewed))
+```
